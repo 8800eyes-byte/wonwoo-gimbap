@@ -3,1031 +3,435 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>원우회 김밥 신청 및 현황 관리 시스템</title>
-
-  <!-- Pretendard Font & FontAwesome Icons -->
-  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- QRCode.js Library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
+  <title>대학원 원우회 김밥 신청 시스템</title>
   <style>
     :root {
-      --primary: #3182f6;
-      --primary-hover: #1b64da;
-      --primary-light: #e8f3ff;
-      --success: #22c55e;
-      --success-light: #dcfce7;
-      --danger: #f04452;
-      --danger-hover: #d92d20;
-      --danger-light: #fee2e2;
-      --warning: #f59e0b;
-      --warning-light: #fef3c7;
-      --bg: #f2f4f6;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg-color: #f8fafc;
       --card-bg: #ffffff;
-      --text-main: #191f28;
-      --text-sub: #4e5968;
-      --text-muted: #8b95a1;
-      --border: #e5e8eb;
-      --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
-      --shadow-md: 0 8px 30px rgba(0,0,0,0.08);
-      --radius-lg: 20px;
-      --radius-md: 12px;
+      --text-main: #1e293b;
+      --text-sub: #64748b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
     }
 
-    * { box-sizing: border-box; font-family: "Pretendard Variable", Pretendard, -apple-system, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; padding: 16px; display: flex; flex-direction: column; align-items: center; }
+    .container { width: 100%; max-width: 500px; background: var(--card-bg); border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01); padding: 24px; margin-top: 10px; }
+    
+    .nav-tabs { display: flex; background: #e2e8f0; padding: 4px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; }
+    .tab-btn { flex: 1; padding: 12px; border: none; background: transparent; font-size: 15px; font-weight: 600; color: var(--text-sub); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+    .tab-btn.active { background: white; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 
-    body {
-      background-color: var(--bg);
-      margin: 0;
-      padding: 20px 16px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      color: var(--text-main);
-    }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h1 { font-size: 22px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; }
+    .header p { font-size: 14px; color: var(--text-sub); }
+    .badge { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin-bottom: 8px; }
+    .date-badge { display: inline-block; background: #1e293b; color: #ffffff; font-size: 14px; font-weight: 600; padding: 6px 14px; border-radius: 8px; margin-bottom: 12px; }
 
-    .app-container {
-      width: 100%;
-      max-width: 520px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
+    .form-group { margin-bottom: 18px; }
+    label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; color: var(--text-main); }
+    select, input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; background: white; outline: none; transition: border-color 0.2s; }
+    select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    
+    button.btn-main { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    button.btn-main:hover { background: var(--primary-hover); }
+    button.btn-secondary { width: 100%; padding: 10px; background: #f1f5f9; color: var(--text-main); border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    button.btn-secondary:hover { background: #e2e8f0; }
 
-    .nav-tabs {
-      display: flex;
-      background: #e5e8eb;
-      padding: 4px;
-      border-radius: 14px;
-      gap: 4px;
-    }
+    .status-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-top: 20px; display: none; }
+    .status-card.active { display: block; }
+    .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .status-title { font-size: 15px; font-weight: 600; }
+    .status-tag { padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700; }
+    .tag-completed { background: #dcfce7; color: #15803d; }
+    .tag-canceled { background: #fee2e2; color: #b91c1c; }
+    .tag-none { background: #f1f5f9; color: #64748b; }
 
-    .nav-tab {
-      flex: 1;
-      padding: 12px 14px;
-      border: none;
-      background: transparent;
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text-sub);
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
+    .admin-panel { display: none; }
+    .admin-panel.active { display: block; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .stat-box { background: #f1f5f9; padding: 16px; border-radius: 10px; text-align: center; }
+    .stat-num { font-size: 24px; font-weight: 700; color: var(--primary); margin-top: 4px; }
+    
+    .list-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+    .list-table th, .list-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+    .list-table th { background: #f8fafc; color: var(--text-sub); font-weight: 600; }
 
-    .nav-tab.active {
-      background: #ffffff;
-      color: var(--primary);
-      box-shadow: var(--shadow-sm);
-    }
+    .loader { display: none; border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    .card {
-      background: var(--card-bg);
-      padding: 26px 20px;
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-md);
-      width: 100%;
-    }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100; }
+    .toast.show { opacity: 1; }
 
-    .header { text-align: center; margin-bottom: 20px; }
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--primary-light);
-      color: var(--primary);
-      font-size: 12px;
-      font-weight: 700;
-      padding: 4px 12px;
-      border-radius: 20px;
-      margin-bottom: 8px;
-    }
-
-    .date-badge {
-      display: inline-block;
-      background: #334155;
-      color: #ffffff;
-      font-size: 14px;
-      font-weight: 700;
-      padding: 6px 14px;
-      border-radius: 8px;
-      margin-top: 6px;
-    }
-
-    .header h2 { margin: 8px 0 6px 0; font-size: 22px; font-weight: 700; }
-    .header p { margin: 0; font-size: 14px; color: var(--text-sub); }
-
-    .form-group { margin-bottom: 16px; }
-    label { display: block; font-weight: 600; font-size: 13px; color: var(--text-sub); margin-bottom: 6px; }
-
-    select, input {
-      width: 100%;
-      height: 48px;
-      padding: 0 16px;
-      font-size: 15px;
-      border: 1.5px solid var(--border);
-      border-radius: var(--radius-md);
-      outline: none;
-      background-color: #fff;
-      color: var(--text-main);
-      transition: all 0.2s;
-    }
-
-    select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(49,130,246,0.1); }
-    select:disabled { background-color: #f9fafb; color: var(--text-muted); cursor: not-allowed; }
-
-    .select-wrapper { position: relative; }
-    .select-wrapper::after {
-      content: '\f107';
-      font-family: 'Font Awesome 6 Free';
-      font-weight: 900;
-      position: absolute;
-      right: 16px; top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
-      pointer-events: none;
-    }
-
-    .btn {
-      width: 100%;
-      height: 50px;
-      font-size: 16px;
-      font-weight: 600;
-      color: #fff;
-      background-color: var(--primary);
-      border: none;
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    .btn:hover { background-color: var(--primary-hover); }
-    .btn-secondary { background-color: #e5e8eb; color: var(--text-main); }
-    .btn-secondary:hover { background-color: #d1d5db; }
-    .btn-danger { background-color: var(--danger); }
-    .btn-danger:hover { background-color: var(--danger-hover); }
-    .btn-sm { height: 36px; font-size: 13px; padding: 0 12px; border-radius: 8px; width: auto; }
-
-    .status-card {
-      border-radius: var(--radius-md);
-      padding: 16px;
-      text-align: center;
-      margin-top: 16px;
-      font-size: 15px;
-      font-weight: 500;
-      line-height: 1.5;
-    }
-
-    .status-card.pending { background-color: var(--primary-light); color: var(--primary-hover); }
-    .status-card.applied { background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
-
-    .ticket-box {
-      background: #ffffff;
-      border: 2px dashed #cbd5e1;
-      border-radius: 16px;
-      padding: 16px;
-      margin-top: 16px;
-      text-align: center;
-    }
-
-    .qr-container { display: flex; justify-content: center; margin: 12px 0; }
-
-    .banner {
-      font-size: 12px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      background: #f1f5f9;
-      color: #475569;
-      margin-bottom: 16px;
-      text-align: center;
-      line-height: 1.4;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .stat-box {
-      background: #f8fafc;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px 6px;
-      text-align: center;
-    }
-
-    .stat-box div:first-child { font-size: 11px; color: var(--text-sub); font-weight: 600; }
-    .stat-box div:last-child { font-size: 16px; font-weight: 800; color: var(--primary); margin-top: 4px; }
-
-    .applicant-list-container {
-      max-height: 380px;
-      overflow-y: auto;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-    }
-
-    .applicant-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border);
-      font-size: 13px;
-    }
-
-    .applicant-item:last-child { border-bottom: none; }
-    .applicant-info { display: flex; flex-direction: column; gap: 2px; }
-    .applicant-info strong { font-size: 14px; color: var(--text-main); }
-    .applicant-info span { font-size: 12px; color: var(--text-sub); }
-
-    .pickup-tag {
-      font-size: 11px;
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-weight: 700;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .pickup-tag.done { background: var(--success-light); color: #15803d; }
-    .pickup-tag.not-yet { background: var(--warning-light); color: #b45309; }
-
-    .link-generator-box {
-      background: #f1f5f9;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 14px;
-      margin-bottom: 16px;
-    }
-
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-      padding: 16px;
-    }
-
-    .modal-overlay.active { opacity: 1; pointer-events: auto; }
-    .modal-card { background: #fff; border-radius: var(--radius-lg); padding: 24px; width: 100%; max-width: 420px; }
-
-    .toast-container { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 2000; width: 90%; max-width: 380px; }
-    .toast {
-      background: #191f28; color: #fff; padding: 12px 20px; border-radius: 30px; font-size: 14px; font-weight: 500;
-      display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.2); margin-top: 8px;
-    }
-
-    .hidden { display: none !important; }
-    .spinner {
-      width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #ffffff; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Print styles */
+    /* 프린트 전용 스타일 */
     @media print {
-      body { background: #fff; padding: 0; }
-      .nav-tabs, .btn, .link-generator-box, .form-group, #connectionBanner, .header p { display: none !important; }
-      .app-container { max-width: 100%; gap: 0; }
-      .card { box-shadow: none; padding: 0; }
-      .applicant-list-container { max-height: none; border: 1px solid #000; }
-      .applicant-item { border-bottom: 1px solid #ddd; }
+      body { background: white; padding: 0; }
+      .nav-tabs, .btn-main, .btn-secondary, .form-group, .header p, .no-print { display: none !important; }
+      .container { max-width: 100%; box-shadow: none; padding: 0; }
+      .list-table th, .list-table td { border: 1px solid #000; padding: 8px; }
     }
   </style>
 </head>
 <body>
 
-<div class="app-container">
-  
-  <!-- NAV TABS -->
+  <!-- 상단 탭 -->
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="switchTab('user')">
-      <i class="fa-solid fa-rice-bowl"></i> 김밥 신청
-    </button>
-    <button class="nav-tab" onclick="switchTab('admin')">
-      <i class="fa-solid fa-list-check"></i> 신청 현황 (임원용)
-    </button>
+    <button class="tab-btn active" onclick="switchTab('user')">김밥 신청</button>
+    <button class="tab-btn" onclick="switchTab('admin')">📋 신청 현황 (임원용)</button>
   </div>
 
-  <!-- 1. USER APPLICATION VIEW -->
-  <div id="userView" class="card">
+  <!-- 사용자 메인 영역 -->
+  <div id="user-section" class="container">
     <div class="header">
-      <div class="header-badge">
-        <i class="fa-solid fa-graduation-cap"></i> 대학원 원우회 복지사업
-      </div>
-      <div>
-        <span class="date-badge" id="displayTargetDate"><i class="fa-regular fa-calendar-check"></i> 날짜 확인 중...</span>
-      </div>
-      <h2>🍙 원우회 김밥 신청</h2>
+      <span class="badge">🎓 대학원 원우회 복지사업</span><br>
+      <div id="display-date-badge" class="date-badge">📅 날짜 불러오는 중...</div>
+      <h1>🍙 원우회 김밥 신청</h1>
       <p>구분, 학과를 선택하고 본인의 성명을 입력해 주세요.</p>
     </div>
 
-    <!-- Connection Banner -->
-    <div id="connectionBanner" class="banner">
-      <i class="fa-solid fa-spinner fa-spin"></i> 구글 시트 데이터 연결 중...
-    </div>
-
-    <!-- 1. 구분 선택 -->
     <div class="form-group">
-      <label for="categorySelect"><i class="fa-solid fa-layer-group"></i> 구분 (학번 구분)</label>
-      <div class="select-wrapper">
-        <select id="categorySelect">
-          <option value="">구분을 불러오는 중...</option>
-        </select>
-      </div>
+      <label for="user-category">📚 구분 (학번 구분)</label>
+      <select id="user-category" onchange="onCategoryChange()">
+        <option value="">구분을 불러오는 중...</option>
+      </select>
     </div>
 
-    <!-- 2. 학과 선택 -->
     <div class="form-group">
-      <label for="deptSelect"><i class="fa-solid fa-building-columns"></i> 학과</label>
-      <div class="select-wrapper">
-        <select id="deptSelect" disabled>
-          <option value="">구분을 먼저 선택하세요</option>
-        </select>
-      </div>
+      <label for="user-dept">🏛️ 학과</label>
+      <select id="user-dept" disabled>
+        <option value="">구분을 먼저 선택하세요</option>
+      </select>
     </div>
 
-    <!-- 3. 성명 직접 입력 -->
     <div class="form-group">
-      <label for="nameInput"><i class="fa-solid fa-user"></i> 성명 (이름 직접 입력)</label>
-      <input type="text" id="nameInput" placeholder="성명을 직접 입력하세요 (예: 홍길동)">
+      <label for="user-name">👤 성명 (이름 직접 입력)</label>
+      <input type="text" id="user-name" placeholder="성명을 직접 입력하세요 (예: 홍길동)">
     </div>
 
-    <button id="checkBtn" class="btn" onclick="checkStatus()">
-      <i class="fa-solid fa-magnifying-glass"></i> 신청 여부 확인
+    <button class="btn-main" onclick="checkStatus()">
+      <div id="btn-loader" class="loader"></div>
+      <span id="btn-text">🔍 신청 여부 확인</span>
     </button>
 
-    <!-- RESULT & SELECTION AREA -->
-    <div id="resultArea" class="hidden">
-      <div id="statusBox" class="status-card"></div>
-
-      <div style="margin-top: 16px;">
-        <button id="applyBtn" class="btn hidden" onclick="submitApply()">
-          <i class="fa-solid fa-check"></i> 김밥 신청하기
-        </button>
-        <button id="cancelBtn" class="btn btn-danger hidden" onclick="confirmCancel()">
-          <i class="fa-solid fa-xmark"></i> 신청 취소하기
-        </button>
+    <!-- Status Card -->
+    <div id="status-card" class="status-card">
+      <div class="status-header">
+        <span class="status-title" id="status-user-info">홍길동 원우님</span>
+        <span id="status-tag" class="status-tag tag-none">미신청</span>
       </div>
-
-      <div id="ticketContainer" class="hidden">
-        <div class="ticket-box">
-          <span style="background: var(--primary); color:#fff; font-size: 10px; font-weight:700; padding:2px 8px; border-radius:10px;">MEAL TICKET</span>
-          <h3 style="margin: 8px 0 4px 0; font-size: 15px;">원우회 간식 수령증</h3>
-          <p id="ticketInfoText" style="margin: 0; font-size: 12px; color: var(--text-sub);"></p>
-          <div class="qr-container"><div id="qrcode"></div></div>
-          <p style="font-size: 11px; color: var(--text-muted); margin:0;">수령장소: 대학원 학생회실</p>
-        </div>
-      </div>
+      <p id="status-desc" style="font-size: 14px; color: var(--text-sub); margin-bottom: 14px;">신청 기록이 없습니다. 김밥을 신청하시겠습니까?</p>
+      
+      <button id="action-btn" class="btn-main" onclick="toggleApplication()">김밥 신청하기</button>
     </div>
   </div>
 
-  <!-- 2. ADMIN STATUS VIEW -->
-  <div id="adminView" class="card hidden">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h3 style="margin:0; font-size: 18px; font-weight: 700;"><i class="fa-solid fa-chart-pie"></i> 실시간 신청 현황</h3>
-      <button class="btn btn-secondary btn-sm" onclick="openSettingsModal()">
-        <i class="fa-solid fa-gear"></i> 연동 설정
-      </button>
+  <!-- 임원용 관리자 영역 -->
+  <div id="admin-section" class="container admin-panel">
+    <div class="header">
+      <h1>📊 김밥 신청 및 출석 관리</h1>
+      <p>실시간 신청 현황 조회 및 출석부 갱신</p>
     </div>
 
-    <!-- Link Generator & Cumulative Sheet Generator -->
-    <div class="link-generator-box">
-      <label style="font-size: 12px; font-weight:700; margin-bottom: 4px; display:block;"><i class="fa-solid fa-link"></i> 수업 날짜별 단톡방 신청 링크 생성기</label>
-      <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-        <input type="date" id="adminDateSelect" onchange="onAdminDateChange()">
-        <button class="btn btn-sm" style="width: auto; white-space: nowrap;" onclick="copyKakaoLink()">
-          <i class="fa-regular fa-copy"></i> 링크 복사
-        </button>
-      </div>
-
-      <!-- PRINT / CUMULATIVE ACTION BUTTONS -->
-      <div style="display: flex; gap: 6px;">
-        <button class="btn btn-sm btn-secondary" style="flex:1;" onclick="generateMonthlySheet()">
-          <i class="fa-solid fa-file-excel"></i> 구글시트 월별 출석부 갱신
-        </button>
-        <button class="btn btn-sm btn-secondary" style="flex:1;" onclick="window.print()">
-          <i class="fa-solid fa-print"></i> 바로 인쇄
-        </button>
-      </div>
+    <div class="form-group no-print">
+      <label for="admin-date">📅 수업/조모임 날짜 선택</label>
+      <input type="date" id="admin-date" onchange="loadAdminData()">
     </div>
 
-    <!-- Stats Summary Cards -->
     <div class="stats-grid">
       <div class="stat-box">
-        <div>전체 원우</div>
-        <div id="statTotal">0명</div>
+        <div style="font-size: 12px; color: var(--text-sub);">총 신청자</div>
+        <div id="stat-applied" class="stat-num">0명</div>
       </div>
       <div class="stat-box">
-        <div>신청 완료</div>
-        <div id="statApplied" style="color: var(--primary);">0명</div>
-      </div>
-      <div class="stat-box">
-        <div>미신청</div>
-        <div id="statUnapplied" style="color: var(--danger);">0명</div>
-      </div>
-      <div class="stat-box">
-        <div>수령 완료</div>
-        <div id="statPicked" style="color: var(--success);">0명</div>
+        <div style="font-size: 12px; color: var(--text-sub);">수령 완료</div>
+        <div id="stat-received" class="stat-num" style="color: var(--success);">0명</div>
       </div>
     </div>
 
-    <!-- Status Filter Buttons -->
-    <div style="display: flex; gap: 6px; margin-bottom: 12px;">
-      <button class="btn btn-sm btn-secondary filter-btn active" id="btnFilterAll" onclick="setAdminFilter('ALL', this)">전체 보기</button>
-      <button class="btn btn-sm btn-secondary filter-btn" id="btnFilterApplied" onclick="setAdminFilter('APPLIED', this)">신청완료만</button>
-      <button class="btn btn-sm btn-secondary filter-btn" id="btnFilterUnapplied" onclick="setAdminFilter('UNAPPLIED', this)">미신청만</button>
+    <div style="display: flex; gap: 8px; margin-bottom: 12px;" class="no-print">
+      <button class="btn-secondary" onclick="updateMonthlySheet()" style="background: #e0e7ff; color: #3730a3; border: none;">📑 구글시트 월별 출석부 갱신</button>
+      <button class="btn-secondary" onclick="window.print()">🖨️ 바로 인쇄</button>
     </div>
 
-    <!-- Search Input -->
-    <div class="form-group" style="margin-bottom: 10px;">
-      <input type="text" id="adminSearchInput" placeholder="이름, 학번 또는 학과 검색..." oninput="filterApplicants()">
-    </div>
+    <button class="btn-secondary no-print" onclick="copyShareLink()" style="margin-top: 0; margin-bottom: 16px;">🔗 카톡 전송용 링크 복사</button>
 
-    <!-- Applicant List Table -->
-    <div class="applicant-list-container" id="applicantList">
-      <div style="padding: 20px; text-align: center; color: var(--text-muted);">
-        데이터를 불러오는 중입니다...
-      </div>
+    <div style="max-height: 400px; overflow-y: auto;">
+      <table class="list-table">
+        <thead>
+          <tr>
+            <th>구분/학과</th>
+            <th>성명</th>
+            <th>상태</th>
+            <th class="no-print">수령체크</th>
+          </tr>
+        </thead>
+        <tbody id="admin-list-body">
+          <tr><td colspan="4" style="text-align: center; color: var(--text-sub);">날짜를 선택해 주세요.</td></tr>
+        </tbody>
+      </table>
     </div>
-
-    <button class="btn btn-secondary" style="margin-top: 14px;" onclick="loadAdminData()">
-      <i class="fa-solid fa-rotate-right"></i> 현황 새로고침
-    </button>
   </div>
 
-</div>
+  <div id="toast" class="toast">메시지</div>
 
-<!-- SETTINGS MODAL -->
-<div id="settingsModal" class="modal-overlay">
-  <div class="modal-card">
-    <h3 style="margin:0 0 12px 0; font-size: 18px;"><i class="fa-solid fa-gear"></i> 구글 시트 연동 설정</h3>
-    <p style="font-size: 13px; color: var(--text-sub); margin:0 0 16px 0;">구글 앱스 스크립트 웹앱 URL (<code>.../exec</code>)을 입력하세요.</p>
+  <script>
+    // 구글 앱스 스크립트 고정 URL
+    const HARDCODED_URL = "https://script.google.com/macros/s/AKfycbwHv7z3qS_hGkHmQ7bEyxTJoG4lD4ApDcoHwplDjgXsLzgxReyFI4tCMkB9tGZCQj9v-Q/exec";
 
-    <div class="form-group">
-      <label for="gasUrlInput">Google Apps Script Web App URL</label>
-      <input type="text" id="gasUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
-    </div>
+    let targetDate = "";
+    let rawMembersData = [];
+    let currentMatchedUser = null;
+    let currentStatus = "미신청";
 
-    <div style="display: flex; gap: 8px; margin-top: 20px;">
-      <button class="btn btn-secondary" onclick="closeSettingsModal()">취소</button>
-      <button class="btn" onclick="saveGASUrl()">저장 및 연동 테스트</button>
-    </div>
-  </div>
-</div>
-
-<!-- CONFIRM MODAL -->
-<div id="customModal" class="modal-overlay">
-  <div class="modal-card">
-    <h3 id="modalTitle" style="margin:0 0 8px 0; font-size: 18px;">확인</h3>
-    <p id="modalMessage" style="margin: 0 0 20px 0; font-size: 14px; color: var(--text-sub);"></p>
-    <div style="display: flex; gap: 8px;">
-      <button id="modalCancelBtn" class="btn btn-secondary">취소</button>
-      <button id="modalConfirmBtn" class="btn btn-danger">확인</button>
-    </div>
-  </div>
-</div>
-
-<!-- TOAST CONTAINER -->
-<div id="toastContainer" class="toast-container"></div>
-
-<script>
-  let API_URL = localStorage.getItem("WONWOO_GAS_URL") || "";
-  let rawStudentList = [];
-  let adminApplicantData = [];
-  let currentTargetDate = "";
-  let currentAdminFilter = 'ALL';
-
-  window.onload = async function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let dateParam = urlParams.get('date');
-
-    if (!dateParam) {
+    window.onload = function() {
+      // 날짜 설정 (URL 파라미터 또는 오늘)
+      const urlParams = new URLSearchParams(window.location.search);
+      const dateParam = urlParams.get('date');
+      
       const today = new Date();
-      dateParam = today.toISOString().split('T')[0];
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+
+      targetDate = dateParam || todayStr;
+      document.getElementById('admin-date').value = targetDate;
+      document.getElementById('display-date-badge').innerText = `📅 ${targetDate} 김밥 신청`;
+
+      fetchInitialData();
+    };
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
-    currentTargetDate = dateParam;
-    updateDateDisplay();
-    document.getElementById("adminDateSelect").value = currentTargetDate;
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('user-section').style.display = 'none';
+      document.getElementById('admin-section').classList.remove('active');
 
-    if (API_URL) {
-      document.getElementById("gasUrlInput").value = API_URL;
-      await fetchSheetData();
-    } else {
-      updateBanner("⚠ 연동 URL이 설정되지 않았습니다.<br>[신청 현황(임원용)] ➔ [연동 설정]에서 URL을 등록해 주세요.", "warning");
-    }
-  };
-
-  function updateDateDisplay() {
-    document.getElementById("displayTargetDate").innerHTML = `<i class="fa-regular fa-calendar-check"></i> ${formatDateWithDay(currentTargetDate)} 김밥 신청`;
-  }
-
-  function formatDateWithDay(dateStr) {
-    if (!dateStr) return "";
-    const days = ['일', '월', '화', '수', '목', '금', '토'];
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return `${dateStr} (${days[d.getDay()]})`;
-  }
-
-  function onAdminDateChange() {
-    const selected = document.getElementById("adminDateSelect").value;
-    if (selected) {
-      currentTargetDate = selected;
-      updateDateDisplay();
-      if (!document.getElementById("adminView").classList.contains("hidden")) {
+      if(tab === 'user') {
+        event.target.classList.add('active');
+        document.getElementById('user-section').style.display = 'block';
+      } else {
+        event.target.classList.add('active');
+        document.getElementById('admin-section').classList.add('active');
         loadAdminData();
       }
     }
-  }
 
-  function copyKakaoLink() {
-    const selectedDate = document.getElementById("adminDateSelect").value || currentTargetDate;
-    const baseUrl = window.location.href.split('?')[0];
-    const fullLink = `${baseUrl}?date=${selectedDate}`;
-
-    navigator.clipboard.writeText(fullLink).then(() => {
-      showToast(`[${selectedDate}] 단톡방 링크가 복사되었습니다!`);
-    }).catch(() => {
-      showToast("링크 복사에 실패했습니다.", "fa-circle-xmark");
-    });
-  }
-
-  async function fetchSheetData() {
-    updateBanner("<i class='fa-solid fa-spinner fa-spin'></i> 구글 시트에서 명단 데이터를 불러오는 중...", "info");
-    try {
-      const res = await fetch(API_URL);
-      const data = await res.json();
-
-      if (data && data.status === "success" && data.students) {
-        rawStudentList = data.students || [];
-        initCategories(rawStudentList);
-        updateBanner(`✅ 구글 시트 연동 완료 (${rawStudentList.length}명 수집됨)`, "success");
-      } else {
-        throw new Error(data.message || "데이터 포맷 오류");
-      }
-    } catch (err) {
-      console.error("Fetch Error:", err);
-      updateBanner("❌ 연동 실패! 웹앱 URL 및 배포 권한('모든 사용자')을 확인해 주세요.", "danger");
-      showToast("구글 시트 연동 실패. URL을 확인해 주세요.", "fa-circle-xmark");
-    }
-  }
-
-  function updateBanner(msg, type = "info") {
-    const banner = document.getElementById("connectionBanner");
-    banner.innerHTML = msg;
-    if (type === "success") {
-      banner.style.background = "var(--success-light)"; banner.style.color = "#15803d";
-    } else if (type === "danger") {
-      banner.style.background = "var(--danger-light)"; banner.style.color = "var(--danger)";
-    } else if (type === "warning") {
-      banner.style.background = "var(--warning-light)"; banner.style.color = "#b45309";
-    } else {
-      banner.style.background = "#f1f5f9"; banner.style.color = "#475569";
-    }
-  }
-
-  function initCategories(students) {
-    const categorySelect = document.getElementById("categorySelect");
-    categorySelect.innerHTML = '<option value="">구분을 선택하세요</option>';
-
-    const categories = [...new Set(students.map(s => s.category).filter(Boolean))];
-
-    if (categories.length === 0) {
-      categorySelect.innerHTML = '<option value="all">전체 명단</option>';
-      initDepartments('all');
-      return;
-    }
-
-    categories.forEach(cat => {
-      const opt = document.createElement("option");
-      opt.value = cat;
-      opt.textContent = cat;
-      categorySelect.appendChild(opt);
-    });
-  }
-
-  document.getElementById("categorySelect").addEventListener("change", function() {
-    initDepartments(this.value);
-  });
-
-  function initDepartments(selectedCategory) {
-    const deptSelect = document.getElementById("deptSelect");
-    deptSelect.innerHTML = '<option value="">학과를 선택하세요</option>';
-
-    if (!selectedCategory) {
-      deptSelect.disabled = true;
-      return;
-    }
-
-    deptSelect.disabled = false;
-    let filteredStudents = rawStudentList;
-    if (selectedCategory !== 'all') {
-      filteredStudents = rawStudentList.filter(s => s.category === selectedCategory);
-    }
-
-    const depts = [...new Set(filteredStudents.map(s => s.dept).filter(Boolean))];
-    depts.forEach(dept => {
-      const opt = document.createElement("option");
-      opt.value = dept;
-      opt.textContent = dept;
-      deptSelect.appendChild(opt);
-    });
-  }
-
-  async function checkStatus() {
-    const category = document.getElementById("categorySelect").value;
-    const dept = document.getElementById("deptSelect").value;
-    const name = document.getElementById("nameInput").value.trim();
-
-    if (!category || !dept || !name) {
-      showToast("구분, 학과를 선택하고 성명을 입력해 주세요.", "fa-circle-exclamation");
-      return;
-    }
-
-    if (!API_URL) {
-      showToast("구글 시트 URL을 먼저 연동해 주세요.", "fa-triangle-exclamation");
-      return;
-    }
-
-    const matched = rawStudentList.find(s => 
-      (s.category === category || category === 'all') && 
-      s.dept === dept && 
-      s.name === name
-    );
-    const resolvedStudentId = matched ? matched.id : "미부여";
-
-    setLoading("checkBtn", true, "조회 중...");
-
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "check", category, dept, studentId: resolvedStudentId, name, targetDate: currentTargetDate })
-      });
-      const data = await res.json();
-
-      renderCheckResult(name, category, dept, resolvedStudentId, data.isApplied);
-    } catch (e) {
-      console.error(e);
-      showToast("조회 중 오류가 발생했습니다.", "fa-circle-xmark");
-    } finally {
-      setLoading("checkBtn", false, "신청 여부 확인");
-    }
-  }
-
-  function renderCheckResult(name, category, dept, studentId, isApplied) {
-    const resultArea = document.getElementById("resultArea");
-    const statusBox = document.getElementById("statusBox");
-    const applyBtn = document.getElementById("applyBtn");
-    const cancelBtn = document.getElementById("cancelBtn");
-    const ticketContainer = document.getElementById("ticketContainer");
-
-    resultArea.classList.remove("hidden");
-
-    if (isApplied) {
-      statusBox.className = "status-card applied";
-      statusBox.innerHTML = `✅ <b>${name}</b> 원우님은<br><b>${currentTargetDate}</b> 김밥 신청이 완료되었습니다.`;
-      applyBtn.classList.add("hidden");
-      cancelBtn.classList.remove("hidden");
-      ticketContainer.classList.remove("hidden");
-
-      const displayIdText = (studentId && !studentId.startsWith('NO_ID_') && studentId !== '미부여') ? studentId : '학번미부여';
-      document.getElementById("ticketInfoText").innerText = `${currentTargetDate} | ${dept} | ${name} (${displayIdText})`;
-      document.getElementById("qrcode").innerHTML = "";
-      new QRCode(document.getElementById("qrcode"), { text: `${currentTargetDate}:${displayIdText}:${name}`, width: 110, height: 110 });
-    } else {
-      statusBox.className = "status-card pending";
-      statusBox.innerHTML = `🍙 <b>${name}</b> 원우님,<br><b>${currentTargetDate}</b> 김밥을 신청하시겠습니까?`;
-      applyBtn.classList.remove("hidden");
-      cancelBtn.classList.add("hidden");
-      ticketContainer.classList.add("hidden");
-    }
-  }
-
-  async function submitApply() {
-    const category = document.getElementById("categorySelect").value;
-    const dept = document.getElementById("deptSelect").value;
-    const name = document.getElementById("nameInput").value.trim();
-
-    const matched = rawStudentList.find(s => 
-      (s.category === category || category === 'all') && 
-      s.dept === dept && 
-      s.name === name
-    );
-    const resolvedStudentId = matched ? matched.id : "미부여";
-
-    setLoading("applyBtn", true, "신청 처리 중...");
-
-    try {
-      await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "apply", category, dept, studentId: resolvedStudentId, name, targetDate: currentTargetDate })
-      });
-      showToast("성공적으로 김밥 신청이 완료되었습니다!");
-      await checkStatus();
-      if (!document.getElementById("adminView").classList.contains("hidden")) {
-        await loadAdminData();
-      }
-    } catch (e) {
-      showToast("신청 중 오류가 발생했습니다.", "fa-circle-xmark");
-    } finally {
-      setLoading("applyBtn", false, "김밥 신청하기");
-    }
-  }
-
-  function confirmCancel() {
-    showConfirmModal("신청 취소", `${currentTargetDate} 김밥 신청을 취소하시겠습니까?`, submitCancel);
-  }
-
-  async function submitCancel() {
-    const category = document.getElementById("categorySelect").value;
-    const dept = document.getElementById("deptSelect").value;
-    const name = document.getElementById("nameInput").value.trim();
-
-    const matched = rawStudentList.find(s => 
-      (s.category === category || category === 'all') && 
-      s.dept === dept && 
-      s.name === name
-    );
-    const resolvedStudentId = matched ? matched.id : "미부여";
-
-    setLoading("cancelBtn", true, "취소 처리 중...");
-
-    try {
-      await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "cancel", category, dept, studentId: resolvedStudentId, name, targetDate: currentTargetDate })
-      });
-      showToast("신청이 취소되었습니다.");
-      await checkStatus();
-      if (!document.getElementById("adminView").classList.contains("hidden")) {
-        await loadAdminData();
-      }
-    } catch (e) {
-      showToast("취소 중 오류가 발생했습니다.", "fa-circle-xmark");
-    } finally {
-      setLoading("cancelBtn", false, "신청 취소하기");
-    }
-  }
-
-  async function loadAdminData() {
-    if (!API_URL) return;
-    const container = document.getElementById("applicantList");
-    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> 현황을 불러오는 중...</div>';
-
-    const selectedAdminDate = document.getElementById("adminDateSelect").value || currentTargetDate;
-
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "getAdminData", targetDate: selectedAdminDate })
-      });
-      const data = await res.json();
-
-      if (data && data.status === "success") {
-        adminApplicantData = data.applicants || [];
-        renderAdminList(adminApplicantData);
-      } else {
-        container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--danger);">데이터를 불러오지 못했습니다.</div>';
-      }
-    } catch (e) {
-      console.error(e);
-      container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--danger);">통신 오류가 발생했습니다.</div>';
-    }
-  }
-
-  async function generateMonthlySheet() {
-    if (!API_URL) return;
-    showToast(`구글 시트 [월별_수령현황] 갱신 중...`, "fa-spinner fa-spin");
-
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "generateMonthlySheet" })
-      });
-      const data = await res.json();
-      if (data.status === "success") {
-        showToast(`구글 시트 [월별_수령현황] 탭이 성공적으로 갱신되었습니다!`);
-      } else {
-        showToast("출석부 갱신 실패", "fa-circle-xmark");
-      }
-    } catch (e) {
-      showToast("서버 오류 발생", "fa-circle-xmark");
-    }
-  }
-
-  function renderAdminList(list) {
-    const container = document.getElementById("applicantList");
-    if (!list || list.length === 0) {
-      container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">조회된 내역이 없습니다.</div>';
-      updateAdminStats(0, 0, 0, 0);
-      return;
-    }
-
-    let appliedCount = 0;
-    let unappliedCount = 0;
-    let pickedCount = 0;
-
-    list.forEach(item => {
-      if (item.applyStatus === '신청완료') {
-        appliedCount++;
-        if (item.isPickedUp) pickedCount++;
-      } else {
-        unappliedCount++;
-      }
-    });
-
-    updateAdminStats(list.length, appliedCount, unappliedCount, pickedCount);
-
-    let filteredList = list;
-    if (currentAdminFilter === 'APPLIED') {
-      filteredList = list.filter(i => i.applyStatus === '신청완료');
-    } else if (currentAdminFilter === 'UNAPPLIED') {
-      filteredList = list.filter(i => i.applyStatus === '미신청');
-    }
-
-    container.innerHTML = "";
-
-    if (filteredList.length === 0) {
-      container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">해당 조건의 원우가 없습니다.</div>';
-      return;
-    }
-
-    filteredList.forEach(item => {
-      const isApplied = item.applyStatus === '신청완료';
-      const div = document.createElement("div");
-      div.className = "applicant-item";
-      div.innerHTML = `
-        <div class="applicant-info">
-          <strong>${item.name} (${item.studentId})</strong>
-          <span>${item.category ? '[' + item.category + '] ' : ''}${item.dept}</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span style="font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; background:${isApplied ? '#dcfce7' : '#f1f5f9'}; color:${isApplied ? '#15803d' : '#64748b'};">
-            ${isApplied ? '신청완료' : '- (미신청)'}
-          </span>
-          ${isApplied ? `
-            <span class="pickup-tag ${item.isPickedUp ? 'done' : 'not-yet'}" onclick="togglePickup('${item.studentId}', '${item.name}', '${item.targetDate}', ${!item.isPickedUp})">
-              ${item.isPickedUp ? '✓ 수령완료' : '미수령'}
-            </span>
-          ` : ''}
-        </div>
-      `;
-      container.appendChild(div);
-    });
-  }
-
-  async function togglePickup(studentId, name, targetDate, newPickedState) {
-    try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "togglePickup",
-          studentId,
-          name,
-          targetDate,
-          isPickedUp: newPickedState
+    function fetchInitialData() {
+      fetch(`${HARDCODED_URL}?action=getInitialData&date=${targetDate}`)
+        .then(res => res.json())
+        .then(data => {
+          if(data.status === 'success') {
+            rawMembersData = data.members;
+            populateCategoryDropdown(rawMembersData);
+          } else {
+            showToast("데이터를 불러오지 못했습니다.");
+          }
         })
+        .catch(err => {
+          showToast("서버 통신 오류가 발생했습니다.");
+        });
+    }
+
+    function populateCategoryDropdown(members) {
+      const catSelect = document.getElementById('user-category');
+      catSelect.innerHTML = '<option value="">구분 선택</option>';
+      
+      const categories = [...new Set(members.map(m => m.category))].filter(Boolean);
+      categories.forEach(cat => {
+        catSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
       });
-      const data = await res.json();
-      if (data.status === "success") {
-        showToast(newPickedState ? `${name} 원우님 수령 완료!` : `${name} 원우님 미수령으로 변경`);
-        loadAdminData();
+    }
+
+    function onCategoryChange() {
+      const selectedCat = document.getElementById('user-category').value;
+      const deptSelect = document.getElementById('user-dept');
+      
+      deptSelect.innerHTML = '<option value="">학과 선택</option>';
+      if(!selectedCat) {
+        deptSelect.disabled = true;
+        return;
       }
-    } catch (e) {
-      showToast("수령 상태 변경 실패", "fa-circle-xmark");
-    }
-  }
 
-  function updateAdminStats(total, applied, unapplied, picked) {
-    document.getElementById("statTotal").innerText = `${total}명`;
-    document.getElementById("statApplied").innerText = `${applied}명`;
-    document.getElementById("statUnapplied").innerText = `${unapplied}명`;
-    document.getElementById("statPicked").innerText = `${picked}명`;
-  }
-
-  function setAdminFilter(filterType, btnEl) {
-    currentAdminFilter = filterType;
-    document.querySelectorAll('.filter-btn').forEach(b => {
-      b.style.background = '#e5e8eb';
-      b.style.color = 'var(--text-main)';
-    });
-    btnEl.style.background = 'var(--primary)';
-    btnEl.style.color = '#fff';
-    filterApplicants();
-  }
-
-  function filterApplicants() {
-    const query = document.getElementById("adminSearchInput").value.toLowerCase();
-    const filtered = adminApplicantData.filter(a => 
-      a.name.toLowerCase().includes(query) || 
-      a.studentId.toLowerCase().includes(query) ||
-      a.dept.toLowerCase().includes(query) ||
-      (a.category && a.category.toLowerCase().includes(query))
-    );
-    renderAdminList(filtered);
-  }
-
-  function switchTab(tab) {
-    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-    if (tab === 'user') {
-      document.querySelectorAll('.nav-tab')[0].classList.add('active');
-      document.getElementById('userView').classList.remove('hidden');
-      document.getElementById('adminView').classList.add('hidden');
-    } else {
-      document.querySelectorAll('.nav-tab')[1].classList.add('active');
-      document.getElementById('userView').classList.add('hidden');
-      document.getElementById('adminView').classList.remove('hidden');
-      loadAdminData();
-    }
-  }
-
-  function openSettingsModal() {
-    document.getElementById('settingsModal').classList.add('active');
-  }
-
-  function closeSettingsModal() {
-    document.getElementById('settingsModal').classList.remove('active');
-  }
-
-  async function saveGASUrl() {
-    const url = document.getElementById("gasUrlInput").value.trim();
-    if (!url.startsWith("https://script.google.com")) {
-      showToast("올바른 Google Apps Script URL을 입력해 주세요.", "fa-circle-exclamation");
-      return;
-    }
-    API_URL = url;
-    localStorage.setItem("WONWOO_GAS_URL", url);
-    showToast("URL이 저장되었습니다.");
-    closeSettingsModal();
-    await fetchSheetData();
-  }
-
-  function showToast(msg, icon = 'fa-circle-check') {
-    const container = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${msg}</span>`;
-    container.appendChild(toast);
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transition = 'all 0.3s ease';
-      setTimeout(() => toast.remove(), 300);
-    }, 2500);
-  }
-
-  function showConfirmModal(title, message, onConfirm) {
-    const modal = document.getElementById('customModal');
-    document.getElementById('modalTitle').innerText = title;
-    document.getElementById('modalMessage').innerText = message;
-    modal.classList.add('active');
-
-    const confirmBtn = document.getElementById('modalConfirmBtn');
-    const cancelBtn = document.getElementById('modalCancelBtn');
-
-    const handleConfirm = () => { modal.classList.remove('active'); cleanup(); onConfirm(); };
-    const handleCancel = () => { modal.classList.remove('active'); cleanup(); };
-
-    function cleanup() {
-      confirmBtn.removeEventListener('click', handleConfirm);
-      cancelBtn.removeEventListener('click', handleCancel);
+      const filteredDepts = [...new Set(rawMembersData.filter(m => m.category === selectedCat).map(m => m.dept))].filter(Boolean);
+      filteredDepts.forEach(dept => {
+        deptSelect.innerHTML += `<option value="${dept}">${dept}</option>`;
+      });
+      deptSelect.disabled = false;
     }
 
-    confirmBtn.addEventListener('click', handleConfirm);
-    cancelBtn.addEventListener('click', handleCancel);
-  }
+    function checkStatus() {
+      const cat = document.getElementById('user-category').value;
+      const dept = document.getElementById('user-dept').value;
+      const name = document.getElementById('user-name').value.trim();
 
-  function setLoading(btnId, isLoading, text) {
-    const btn = document.getElementById(btnId);
-    if (isLoading) {
-      btn.disabled = true;
-      btn.innerHTML = `<span class="spinner"></span> <span>${text}</span>`;
-    } else {
-      btn.disabled = false;
-      btn.innerHTML = `<i class="fa-solid fa-check"></i> <span>${text}</span>`;
+      if(!cat || !dept || !name) {
+        showToast("구분, 학과, 성명을 모두 입력해 주세요.");
+        return;
+      }
+
+      const matched = rawMembersData.find(m => m.category === cat && m.dept === dept && m.name === name);
+      if(!matched) {
+        showToast("명단에서 일치하는 원우 정보를 찾을 수 없습니다.");
+        return;
+      }
+
+      currentMatchedUser = matched;
+      setLoading(true);
+
+      fetch(`${HARDCODED_URL}?action=getUserStatus&studentId=${matched.studentId}&date=${targetDate}`)
+        .then(res => res.json())
+        .then(data => {
+          setLoading(false);
+          if(data.status === 'success') {
+            currentStatus = data.userStatus;
+            renderStatusCard(matched, currentStatus);
+          }
+        })
+        .catch(() => {
+          setLoading(false);
+          showToast("상태 조회에 실패했습니다.");
+        });
     }
-  }
-</script>
+
+    function renderStatusCard(user, status) {
+      const card = document.getElementById('status-card');
+      const tag = document.getElementById('status-tag');
+      const desc = document.getElementById('status-desc');
+      const btn = document.getElementById('action-btn');
+
+      document.getElementById('status-user-info').innerText = `${user.name} 원우님 (${user.dept})`;
+      card.classList.add('active');
+
+      if(status === '신청완료' || status === '수령완료') {
+        tag.className = 'status-tag tag-completed';
+        tag.innerText = status;
+        desc.innerText = `현재 [${status}] 상태입니다. 취소를 원하시면 아래 버튼을 누르세요.`;
+        btn.innerText = '신청 취소하기';
+        btn.style.background = 'var(--danger)';
+      } else {
+        tag.className = 'status-tag tag-none';
+        tag.innerText = '미신청';
+        desc.innerText = '신청 기록이 없습니다. 김밥을 신청하시겠습니까?';
+        btn.innerText = '김밥 신청하기';
+        btn.style.background = 'var(--primary)';
+      }
+    }
+
+    function toggleApplication() {
+      if(!currentMatchedUser) return;
+      const newStatus = (currentStatus === '신청완료' || currentStatus === '수령완료') ? '신청취소' : '신청완료';
+
+      setLoading(true);
+      fetch(HARDCODED_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `action=updateStatus&studentId=${currentMatchedUser.studentId}&name=${encodeURIComponent(currentMatchedUser.name)}&category=${encodeURIComponent(currentMatchedUser.category)}&dept=${encodeURIComponent(currentMatchedUser.dept)}&date=${targetDate}&status=${encodeURIComponent(newStatus)}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        setLoading(false);
+        if(data.status === 'success') {
+          showToast(newStatus === '신청완료' ? '신청이 완료되었습니다!' : '신청이 취소되었습니다.');
+          currentStatus = newStatus;
+          renderStatusCard(currentMatchedUser, currentStatus);
+        }
+      })
+      .catch(() => {
+        setLoading(false);
+        showToast("처리 중 오류가 발생했습니다.");
+      });
+    }
+
+    function loadAdminData() {
+      const date = document.getElementById('admin-date').value;
+      if(!date) return;
+
+      fetch(`${HARDCODED_URL}?action=getAdminData&date=${date}`)
+        .then(res => res.json())
+        .then(data => {
+          if(data.status === 'success') {
+            document.getElementById('stat-applied').innerText = `${data.appliedCount}명`;
+            document.getElementById('stat-received').innerText = `${data.receivedCount}명`;
+
+            const tbody = document.getElementById('admin-list-body');
+            tbody.innerHTML = '';
+
+            if(data.records.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-sub);">신청 내역이 없습니다.</td></tr>';
+              return;
+            }
+
+            data.records.forEach(r => {
+              tbody.innerHTML += `
+                <tr>
+                  <td>${r.category} ${r.dept}</td>
+                  <td><strong>${r.name}</strong></td>
+                  <td><span class="status-tag ${r.status === '수령완료' ? 'tag-completed' : (r.status === '신청취소' ? 'tag-canceled' : 'tag-none')}">${r.status}</span></td>
+                  <td class="no-print">
+                    ${r.status === '신청완료' ? `<button onclick="markReceive('${r.studentId}')" style="padding:4px 8px; font-size:12px; background:var(--primary); color:white; border:none; border-radius:4px; cursor:pointer;">수령확인</button>` : '-'}
+                  </td>
+                </tr>
+              `;
+            });
+          }
+        });
+    }
+
+    function markReceive(studentId) {
+      const date = document.getElementById('admin-date').value;
+      fetch(HARDCODED_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `action=updateStatus&studentId=${studentId}&date=${date}&status=${encodeURIComponent('수령완료')}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.status === 'success') {
+          showToast("수령 처리되었습니다.");
+          loadAdminData();
+        }
+      });
+    }
+
+    function updateMonthlySheet() {
+      const date = document.getElementById('admin-date').value;
+      showToast("월별 출석부를 갱신하는 중입니다...");
+      fetch(HARDCODED_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `action=generateMonthlySheet&date=${date}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.status === 'success') {
+          showToast("구글 시트에 '월별_수령현황' 탭이 성공적으로 갱신되었습니다!");
+        }
+      });
+    }
+
+    function copyShareLink() {
+      const date = document.getElementById('admin-date').value;
+      const shareUrl = `${window.location.origin}${window.location.pathname}?date=${date}`;
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showToast("카톡 전송용 링크가 복사되었습니다!");
+      });
+    }
+
+    function setLoading(isLoading) {
+      document.getElementById('btn-loader').style.display = isLoading ? 'block' : 'none';
+      document.getElementById('btn-text').style.display = isLoading ? 'none' : 'inline';
+    }
+  </script>
 </body>
 </html>
