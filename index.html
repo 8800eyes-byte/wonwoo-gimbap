@@ -133,7 +133,7 @@
 
     <div class="form-group no-print">
       <label for="admin-date">📅 수업/조모임 날짜 선택</label>
-      <input type="date" id="admin-date" onchange="loadAdminData()">
+      <input type="date" id="admin-date" onchange="onAdminDateChange()">
     </div>
 
     <div class="stats-grid">
@@ -191,12 +191,26 @@
       const dd = String(today.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
 
-      targetDate = dateParam || todayStr;
-      document.getElementById('admin-date').value = targetDate;
-      document.getElementById('display-date-badge').innerText = `📅 ${targetDate} 김밥 신청`;
-
+      updateTargetDate(dateParam || todayStr);
       fetchInitialData();
     };
+
+    function updateTargetDate(newDate) {
+      targetDate = newDate;
+      document.getElementById('admin-date').value = targetDate;
+      document.getElementById('display-date-badge').innerText = `📅 ${targetDate} 김밥 신청`;
+      
+      // 날짜가 바뀔 때 조회 중이던 카드 초기화
+      document.getElementById('status-card').classList.remove('active');
+    }
+
+    function onAdminDateChange() {
+      const selectedDate = document.getElementById('admin-date').value;
+      if (selectedDate) {
+        updateTargetDate(selectedDate);
+        loadAdminData();
+      }
+    }
 
     function showToast(msg) {
       const toast = document.getElementById('toast');
@@ -220,12 +234,11 @@
       }
     }
 
-    // CORS 차단 우회를 위한 JSONP 통신 방식
     function jsonpCall(params, callback) {
       const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
       window[callbackName] = function(data) {
         delete window[callbackName];
-        document.body.removeChild(script);
+        if (script.parentNode) document.body.removeChild(script);
         callback(null, data);
       };
 
@@ -235,7 +248,7 @@
       script.src = `${HARDCODED_URL}?${queryString}`;
       script.onerror = function() {
         delete window[callbackName];
-        document.body.removeChild(script);
+        if (script.parentNode) document.body.removeChild(script);
         callback(new Error('JSONP Error'), null);
       };
       document.body.appendChild(script);
@@ -247,7 +260,7 @@
           rawMembersData = data.members;
           populateCategoryDropdown(rawMembersData);
         } else {
-          showToast("서버 통신 중 오류가 발생했습니다. Apps Script 배포 버전을 확인하세요.");
+          showToast("구글 시트 데이터를 불러오는 데 실패했습니다.");
         }
       });
     }
