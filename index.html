@@ -67,7 +67,6 @@
     .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100; }
     .toast.show { opacity: 1; }
 
-    /* 프린트 전용 스타일 */
     @media print {
       body { background: white; padding: 0; }
       .nav-tabs, .btn-main, .btn-secondary, .form-group, .header p, .no-print { display: none !important; }
@@ -78,13 +77,11 @@
 </head>
 <body>
 
-  <!-- 상단 탭 -->
   <div class="nav-tabs">
     <button class="tab-btn active" onclick="switchTab('user')">김밥 신청</button>
     <button class="tab-btn" onclick="switchTab('admin')">📋 신청 현황 (임원용)</button>
   </div>
 
-  <!-- 사용자 메인 영역 -->
   <div id="user-section" class="container">
     <div class="header">
       <span class="badge">🎓 대학원 원우회 복지사업</span><br>
@@ -101,7 +98,7 @@
     </div>
 
     <div class="form-group">
-      <label for="user-dept">🏛️ 학과</label>
+      <label for="user-dept">🏛️️ 학과</label>
       <select id="user-dept" disabled>
         <option value="">구분을 먼저 선택하세요</option>
       </select>
@@ -117,10 +114,9 @@
       <span id="btn-text">🔍 신청 여부 확인</span>
     </button>
 
-    <!-- Status Card -->
     <div id="status-card" class="status-card">
       <div class="status-header">
-        <span class="status-title" id="status-user-info">홍길동 원우님</span>
+        <span class="status-title" id="status-user-info">원우님</span>
         <span id="status-tag" class="status-tag tag-none">미신청</span>
       </div>
       <p id="status-desc" style="font-size: 14px; color: var(--text-sub); margin-bottom: 14px;">신청 기록이 없습니다. 김밥을 신청하시겠습니까?</p>
@@ -129,7 +125,6 @@
     </div>
   </div>
 
-  <!-- 임원용 관리자 영역 -->
   <div id="admin-section" class="container admin-panel">
     <div class="header">
       <h1>📊 김밥 신청 및 출석 관리</h1>
@@ -179,7 +174,6 @@
   <div id="toast" class="toast">메시지</div>
 
   <script>
-    // 구글 앱스 스크립트 고정 URL
     const HARDCODED_URL = "https://script.google.com/macros/s/AKfycbwHv7z3qS_hGkHmQ7bEyxTJoG4lD4ApDcoHwplDjgXsLzgxReyFI4tCMkB9tGZCQj9v-Q/exec";
 
     let targetDate = "";
@@ -188,7 +182,6 @@
     let currentStatus = "미신청";
 
     window.onload = function() {
-      // 날짜 설정 (URL 파라미터 또는 오늘)
       const urlParams = new URLSearchParams(window.location.search);
       const dateParam = urlParams.get('date');
       
@@ -227,20 +220,28 @@
       }
     }
 
+    // CORS 우회 API 호출
+    function apiCall(params, callback) {
+      const queryString = new URLSearchParams(params).toString();
+      fetch(`${HARDCODED_URL}?${queryString}`, {
+        method: 'GET',
+        mode: 'cors',
+        redirect: 'follow'
+      })
+      .then(res => res.json())
+      .then(data => callback(null, data))
+      .catch(err => callback(err, null));
+    }
+
     function fetchInitialData() {
-      fetch(`${HARDCODED_URL}?action=getInitialData&date=${targetDate}`)
-        .then(res => res.json())
-        .then(data => {
-          if(data.status === 'success') {
-            rawMembersData = data.members;
-            populateCategoryDropdown(rawMembersData);
-          } else {
-            showToast("데이터를 불러오지 못했습니다.");
-          }
-        })
-        .catch(err => {
-          showToast("서버 통신 오류가 발생했습니다.");
-        });
+      apiCall({ action: 'getInitialData', date: targetDate }, (err, data) => {
+        if(!err && data && data.status === 'success') {
+          rawMembersData = data.members;
+          populateCategoryDropdown(rawMembersData);
+        } else {
+          showToast("구글 시트 연동 정보를 불러오는 중입니다...");
+        }
+      });
     }
 
     function populateCategoryDropdown(members) {
@@ -289,19 +290,15 @@
       currentMatchedUser = matched;
       setLoading(true);
 
-      fetch(`${HARDCODED_URL}?action=getUserStatus&studentId=${matched.studentId}&date=${targetDate}`)
-        .then(res => res.json())
-        .then(data => {
-          setLoading(false);
-          if(data.status === 'success') {
-            currentStatus = data.userStatus;
-            renderStatusCard(matched, currentStatus);
-          }
-        })
-        .catch(() => {
-          setLoading(false);
+      apiCall({ action: 'getUserStatus', studentId: matched.studentId, date: targetDate }, (err, data) => {
+        setLoading(false);
+        if(!err && data && data.status === 'success') {
+          currentStatus = data.userStatus;
+          renderStatusCard(matched, currentStatus);
+        } else {
           showToast("상태 조회에 실패했습니다.");
-        });
+        }
+      });
     }
 
     function renderStatusCard(user, status) {
@@ -333,23 +330,26 @@
       const newStatus = (currentStatus === '신청완료' || currentStatus === '수령완료') ? '신청취소' : '신청완료';
 
       setLoading(true);
-      fetch(HARDCODED_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `action=updateStatus&studentId=${currentMatchedUser.studentId}&name=${encodeURIComponent(currentMatchedUser.name)}&category=${encodeURIComponent(currentMatchedUser.category)}&dept=${encodeURIComponent(currentMatchedUser.dept)}&date=${targetDate}&status=${encodeURIComponent(newStatus)}`
-      })
-      .then(res => res.json())
-      .then(data => {
+
+      const params = {
+        action: 'updateStatus',
+        studentId: currentMatchedUser.studentId,
+        name: currentMatchedUser.name,
+        category: currentMatchedUser.category,
+        dept: currentMatchedUser.dept,
+        date: targetDate,
+        status: newStatus
+      };
+
+      apiCall(params, (err, data) => {
         setLoading(false);
-        if(data.status === 'success') {
+        if(!err && data && data.status === 'success') {
           showToast(newStatus === '신청완료' ? '신청이 완료되었습니다!' : '신청이 취소되었습니다.');
           currentStatus = newStatus;
           renderStatusCard(currentMatchedUser, currentStatus);
+        } else {
+          showToast("처리 중 오류가 발생했습니다.");
         }
-      })
-      .catch(() => {
-        setLoading(false);
-        showToast("처리 중 오류가 발생했습니다.");
       });
     }
 
@@ -357,47 +357,39 @@
       const date = document.getElementById('admin-date').value;
       if(!date) return;
 
-      fetch(`${HARDCODED_URL}?action=getAdminData&date=${date}`)
-        .then(res => res.json())
-        .then(data => {
-          if(data.status === 'success') {
-            document.getElementById('stat-applied').innerText = `${data.appliedCount}명`;
-            document.getElementById('stat-received').innerText = `${data.receivedCount}명`;
+      apiCall({ action: 'getAdminData', date: date }, (err, data) => {
+        if(!err && data && data.status === 'success') {
+          document.getElementById('stat-applied').innerText = `${data.appliedCount}명`;
+          document.getElementById('stat-received').innerText = `${data.receivedCount}명`;
 
-            const tbody = document.getElementById('admin-list-body');
-            tbody.innerHTML = '';
+          const tbody = document.getElementById('admin-list-body');
+          tbody.innerHTML = '';
 
-            if(data.records.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-sub);">신청 내역이 없습니다.</td></tr>';
-              return;
-            }
-
-            data.records.forEach(r => {
-              tbody.innerHTML += `
-                <tr>
-                  <td>${r.category} ${r.dept}</td>
-                  <td><strong>${r.name}</strong></td>
-                  <td><span class="status-tag ${r.status === '수령완료' ? 'tag-completed' : (r.status === '신청취소' ? 'tag-canceled' : 'tag-none')}">${r.status}</span></td>
-                  <td class="no-print">
-                    ${r.status === '신청완료' ? `<button onclick="markReceive('${r.studentId}')" style="padding:4px 8px; font-size:12px; background:var(--primary); color:white; border:none; border-radius:4px; cursor:pointer;">수령확인</button>` : '-'}
-                  </td>
-                </tr>
-              `;
-            });
+          if(data.records.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-sub);">신청 내역이 없습니다.</td></tr>';
+            return;
           }
-        });
+
+          data.records.forEach(r => {
+            tbody.innerHTML += `
+              <tr>
+                <td>${r.category} ${r.dept}</td>
+                <td><strong>${r.name}</strong></td>
+                <td><span class="status-tag ${r.status === '수령완료' ? 'tag-completed' : (r.status === '신청취소' ? 'tag-canceled' : 'tag-none')}">${r.status}</span></td>
+                <td class="no-print">
+                  ${r.status === '신청완료' ? `<button onclick="markReceive('${r.studentId}')" style="padding:4px 8px; font-size:12px; background:var(--primary); color:white; border:none; border-radius:4px; cursor:pointer;">수령확인</button>` : '-'}
+                </td>
+              </tr>
+            `;
+          });
+        }
+      });
     }
 
     function markReceive(studentId) {
       const date = document.getElementById('admin-date').value;
-      fetch(HARDCODED_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `action=updateStatus&studentId=${studentId}&date=${date}&status=${encodeURIComponent('수령완료')}`
-      })
-      .then(res => res.json())
-      .then(data => {
-        if(data.status === 'success') {
+      apiCall({ action: 'updateStatus', studentId: studentId, date: date, status: '수령완료' }, (err, data) => {
+        if(!err && data && data.status === 'success') {
           showToast("수령 처리되었습니다.");
           loadAdminData();
         }
@@ -407,14 +399,8 @@
     function updateMonthlySheet() {
       const date = document.getElementById('admin-date').value;
       showToast("월별 출석부를 갱신하는 중입니다...");
-      fetch(HARDCODED_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `action=generateMonthlySheet&date=${date}`
-      })
-      .then(res => res.json())
-      .then(data => {
-        if(data.status === 'success') {
+      apiCall({ action: 'generateMonthlySheet', date: date }, (err, data) => {
+        if(!err && data && data.status === 'success') {
           showToast("구글 시트에 '월별_수령현황' 탭이 성공적으로 갱신되었습니다!");
         }
       });
