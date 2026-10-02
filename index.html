@@ -98,7 +98,7 @@
     </div>
 
     <div class="form-group">
-      <label for="user-dept">🏛️️ 학과</label>
+      <label for="user-dept">🏛 학과</label>
       <select id="user-dept" disabled>
         <option value="">구분을 먼저 선택하세요</option>
       </select>
@@ -220,26 +220,34 @@
       }
     }
 
-    // CORS 우회 API 호출
-    function apiCall(params, callback) {
+    // CORS 차단 우회를 위한 JSONP 통신 방식
+    function jsonpCall(params, callback) {
+      const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        callback(null, data);
+      };
+
+      params.callback = callbackName;
       const queryString = new URLSearchParams(params).toString();
-      fetch(`${HARDCODED_URL}?${queryString}`, {
-        method: 'GET',
-        mode: 'cors',
-        redirect: 'follow'
-      })
-      .then(res => res.json())
-      .then(data => callback(null, data))
-      .catch(err => callback(err, null));
+      const script = document.createElement('script');
+      script.src = `${HARDCODED_URL}?${queryString}`;
+      script.onerror = function() {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        callback(new Error('JSONP Error'), null);
+      };
+      document.body.appendChild(script);
     }
 
     function fetchInitialData() {
-      apiCall({ action: 'getInitialData', date: targetDate }, (err, data) => {
+      jsonpCall({ action: 'getInitialData', date: targetDate }, (err, data) => {
         if(!err && data && data.status === 'success') {
           rawMembersData = data.members;
           populateCategoryDropdown(rawMembersData);
         } else {
-          showToast("구글 시트 연동 정보를 불러오는 중입니다...");
+          showToast("서버 통신 중 오류가 발생했습니다. Apps Script 배포 버전을 확인하세요.");
         }
       });
     }
@@ -290,7 +298,7 @@
       currentMatchedUser = matched;
       setLoading(true);
 
-      apiCall({ action: 'getUserStatus', studentId: matched.studentId, date: targetDate }, (err, data) => {
+      jsonpCall({ action: 'getUserStatus', studentId: matched.studentId, date: targetDate }, (err, data) => {
         setLoading(false);
         if(!err && data && data.status === 'success') {
           currentStatus = data.userStatus;
@@ -341,7 +349,7 @@
         status: newStatus
       };
 
-      apiCall(params, (err, data) => {
+      jsonpCall(params, (err, data) => {
         setLoading(false);
         if(!err && data && data.status === 'success') {
           showToast(newStatus === '신청완료' ? '신청이 완료되었습니다!' : '신청이 취소되었습니다.');
@@ -357,7 +365,7 @@
       const date = document.getElementById('admin-date').value;
       if(!date) return;
 
-      apiCall({ action: 'getAdminData', date: date }, (err, data) => {
+      jsonpCall({ action: 'getAdminData', date: date }, (err, data) => {
         if(!err && data && data.status === 'success') {
           document.getElementById('stat-applied').innerText = `${data.appliedCount}명`;
           document.getElementById('stat-received').innerText = `${data.receivedCount}명`;
@@ -388,7 +396,7 @@
 
     function markReceive(studentId) {
       const date = document.getElementById('admin-date').value;
-      apiCall({ action: 'updateStatus', studentId: studentId, date: date, status: '수령완료' }, (err, data) => {
+      jsonpCall({ action: 'updateStatus', studentId: studentId, date: date, status: '수령완료' }, (err, data) => {
         if(!err && data && data.status === 'success') {
           showToast("수령 처리되었습니다.");
           loadAdminData();
@@ -399,7 +407,7 @@
     function updateMonthlySheet() {
       const date = document.getElementById('admin-date').value;
       showToast("월별 출석부를 갱신하는 중입니다...");
-      apiCall({ action: 'generateMonthlySheet', date: date }, (err, data) => {
+      jsonpCall({ action: 'generateMonthlySheet', date: date }, (err, data) => {
         if(!err && data && data.status === 'success') {
           showToast("구글 시트에 '월별_수령현황' 탭이 성공적으로 갱신되었습니다!");
         }
