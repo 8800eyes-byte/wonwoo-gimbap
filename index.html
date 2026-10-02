@@ -174,11 +174,8 @@
   <div id="toast" class="toast">메시지</div>
 
   <script>
-    // ▼ 여기에 설정된 주소를 계속 유지합니다.
+    // ▼ 배포된 Apps Script 주소 유지
     const HARDCODED_URL = "https://script.google.com/macros/s/AKfycbwHv7z3qS_hGkHmQ7bEyxTJoG4lD4ApDcoHwplDjgXsLzgxReyFI4tCMkB9tGZCQj9v-Q/exec";
-    
-    // ▼ 임원용 접속 비밀번호 설정 (원하시는 비밀번호로 변경하세요)
-    const ADMIN_PASSWORD = "1234";
 
     let targetDate = "";
     let rawMembersData = [];
@@ -221,20 +218,35 @@
       setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
-    // 탭 전환 시 비밀번호 확인 기능 추가
+    // 서버를 통해 비밀번호를 안전하게 검증하는 탭 전환 함수
     function switchTab(tab, btnElement) {
       if (tab === 'admin') {
         const isAdmin = sessionStorage.getItem('isAdminAuthenticated');
         if (isAdmin !== 'true') {
           const inputPwd = prompt("접근 권한이 필요합니다.\n임원용 비밀번호를 입력해 주세요.");
-          if (inputPwd !== ADMIN_PASSWORD) {
-            alert("비밀번호가 일치하지 않습니다.");
-            return; // 탭 이동 중지
-          }
-          sessionStorage.setItem('isAdminAuthenticated', 'true'); // 세션 동안 기억
+          if (!inputPwd) return; // 취소 누름
+          
+          showToast("비밀번호 확인 중...");
+          
+          jsonpCall({ action: 'verifyPassword', pwd: inputPwd }, (err, data) => {
+            if(!err && data && data.status === 'success') {
+              if (data.isValid) {
+                sessionStorage.setItem('isAdminAuthenticated', 'true');
+                executeTabSwitch('admin', btnElement);
+              } else {
+                alert("비밀번호가 일치하지 않습니다.");
+              }
+            } else {
+              showToast("서버 통신 오류가 발생했습니다.");
+            }
+          });
+          return; 
         }
       }
+      executeTabSwitch(tab, btnElement);
+    }
 
+    function executeTabSwitch(tab, btnElement) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.getElementById('user-section').style.display = 'none';
       document.getElementById('admin-section').classList.remove('active');
