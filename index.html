@@ -90,6 +90,11 @@
       <p>구분, 학과를 선택하고 본인의 성명을 입력해 주세요.</p>
     </div>
 
+    <!-- 마감 안내 배너 -->
+    <div id="closed-banner" style="display:none; background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 16px;">
+      🛑 현재 김밥 신청이 마감되었습니다.
+    </div>
+
     <div class="form-group">
       <label for="user-category">📚 구분 (학번 구분)</label>
       <select id="user-category" onchange="onCategoryChange()">
@@ -129,6 +134,15 @@
     <div class="header">
       <h1>📊 김밥 신청 및 출석 관리</h1>
       <p>실시간 신청 현황 조회 및 출석부 갱신</p>
+    </div>
+
+    <!-- 마감 제어 패널 -->
+    <div style="margin-bottom: 20px; padding: 16px; background: #f8fafc; border: 1px solid var(--border); border-radius: 12px;" class="no-print">
+      <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚙️ 신청 접수 제어</div>
+      <button id="btn-toggle-sys" class="btn-main" style="background: var(--warning);" onclick="toggleSystemState()">
+        🛑 신청 마감하기 (접수 중단)
+      </button>
+      <p style="font-size: 12px; color: var(--text-sub); margin-top: 8px; line-height: 1.4;">마감 처리 시 원우들이 더 이상 신청하거나 취소할 수 없습니다.</p>
     </div>
 
     <div class="form-group no-print">
@@ -174,13 +188,13 @@
   <div id="toast" class="toast">메시지</div>
 
   <script>
-    // ▼ 배포된 Apps Script 주소 유지
     const HARDCODED_URL = "https://script.google.com/macros/s/AKfycbwHv7z3qS_hGkHmQ7bEyxTJoG4lD4ApDcoHwplDjgXsLzgxReyFI4tCMkB9tGZCQj9v-Q/exec";
 
     let targetDate = "";
     let rawMembersData = [];
     let currentMatchedUser = null;
     let currentStatus = "미신청";
+    let sysStatus = "진행"; // 진행 or 마감
 
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -218,13 +232,12 @@
       setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
-    // 서버를 통해 비밀번호를 안전하게 검증하는 탭 전환 함수
     function switchTab(tab, btnElement) {
       if (tab === 'admin') {
         const isAdmin = sessionStorage.getItem('isAdminAuthenticated');
         if (isAdmin !== 'true') {
           const inputPwd = prompt("접근 권한이 필요합니다.\n임원용 비밀번호를 입력해 주세요.");
-          if (!inputPwd) return; // 취소 누름
+          if (!inputPwd) return; 
           
           showToast("비밀번호 확인 중...");
           
@@ -286,8 +299,52 @@
         if(!err && data && data.status === 'success') {
           rawMembersData = data.members;
           populateCategoryDropdown(rawMembersData);
+          
+          // 마감 상태 반영
+          sysStatus = data.sysStatus || "진행";
+          updateSysStatusUI();
         } else {
           showToast("구글 시트 데이터를 불러오는 데 실패했습니다.");
+        }
+      });
+    }
+
+    // 마감 상태 UI 업데이트
+    function updateSysStatusUI() {
+      const banner = document.getElementById('closed-banner');
+      const btnToggle = document.getElementById('btn-toggle-sys');
+      
+      if (sysStatus === '마감') {
+        if(banner) banner.style.display = 'block';
+        if(btnToggle) {
+          btnToggle.innerHTML = '✅ 신청 다시 열기';
+          btnToggle.style.background = 'var(--success)';
+        }
+      } else {
+        if(banner) banner.style.display = 'none';
+        if(btnToggle) {
+          btnToggle.innerHTML = '🛑 신청 마감하기 (접수 중단)';
+          btnToggle.style.background = 'var(--warning)';
+        }
+      }
+    }
+
+    // 마감 버튼 누를 때 실행되는 함수
+    function toggleSystemState() {
+      const newStatus = (sysStatus === '진행') ? '마감' : '진행';
+      if(!confirm(`정말로 신청을 '${newStatus}' 처리하시겠습니까?`)) return;
+      
+      const btnToggle = document.getElementById('btn-toggle-sys');
+      btnToggle.innerHTML = '처리중...';
+      
+      jsonpCall({ action: 'toggleSystemStatus', newStatus: newStatus }, (err, data) => {
+        if(!err && data && data.status === 'success') {
+          sysStatus = data.sysStatus;
+          updateSysStatusUI();
+          showToast(`정상적으로 ${newStatus} 처리되었습니다.`);
+        } else {
+          showToast("오류가 발생했습니다.");
+          updateSysStatusUI(); // 원래대로 복구
         }
       });
     }
@@ -361,7 +418,7 @@
       if(status === '신청완료' || status === '수령완료') {
         tag.className = 'status-tag tag-completed';
         tag.innerText = status;
-        desc.innerText = `현재 [${status}] 상태입니다. 취소를 원하시면 아래 버튼을 누르세요.`;
+        desc.innerText = `현재 [${status}] 상태입니다.`;
         btn.innerText = '신청 취소하기';
         btn.style.background = 'var(--danger)';
       } else {
@@ -371,14 +428,29 @@
         btn.innerText = '김밥 신청하기';
         btn.style.background = 'var(--primary)';
       }
+
+      // 시스템이 마감된 상태라면 버튼 비활성화 처리
+      if (sysStatus === '마감') {
+        btn.disabled = true;
+        btn.innerText = '신청 및 취소 불가 (마감)';
+        btn.style.background = '#94a3b8'; // 회색
+        btn.style.cursor = 'not-allowed';
+      } else {
+        btn.disabled = false;
+        btn.style.cursor = 'pointer';
+      }
     }
 
     function toggleApplication() {
       if(!currentMatchedUser) return;
+      if (sysStatus === '마감') {
+        alert("현재 접수가 마감되어 변경할 수 없습니다.");
+        return;
+      }
+
       const newStatus = (currentStatus === '신청완료' || currentStatus === '수령완료') ? '신청취소' : '신청완료';
 
       setLoading(true);
-
       const params = {
         action: 'updateStatus',
         studentId: currentMatchedUser.studentId,
