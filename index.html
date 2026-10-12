@@ -90,7 +90,6 @@
       <p>구분, 학과를 선택하고 본인의 성명을 입력해 주세요.</p>
     </div>
 
-    <!-- 마감 안내 배너 -->
     <div id="closed-banner" style="display:none; background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 16px;">
       🛑 현재 김밥 신청이 마감되었습니다.
     </div>
@@ -136,7 +135,6 @@
       <p>실시간 신청 현황 조회 및 출석부 갱신</p>
     </div>
 
-    <!-- 마감 제어 패널 -->
     <div style="margin-bottom: 20px; padding: 16px; background: #f8fafc; border: 1px solid var(--border); border-radius: 12px;" class="no-print">
       <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚙️ 신청 접수 제어</div>
       <button id="btn-toggle-sys" class="btn-main" style="background: var(--warning);" onclick="toggleSystemState()">
@@ -194,7 +192,8 @@
     let rawMembersData = [];
     let currentMatchedUser = null;
     let currentStatus = "미신청";
-    let sysStatus = "진행"; // 진행 or 마감
+    let sysStatus = "진행"; 
+    let isVerifyingPwd = false; 
 
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -236,12 +235,16 @@
       if (tab === 'admin') {
         const isAdmin = sessionStorage.getItem('isAdminAuthenticated');
         if (isAdmin !== 'true') {
+          if (isVerifyingPwd) return; 
+
           const inputPwd = prompt("접근 권한이 필요합니다.\n임원용 비밀번호를 입력해 주세요.");
           if (!inputPwd) return; 
           
+          isVerifyingPwd = true; 
           showToast("비밀번호 확인 중...");
           
           jsonpCall({ action: 'verifyPassword', pwd: inputPwd }, (err, data) => {
+            isVerifyingPwd = false; 
             if(!err && data && data.status === 'success') {
               if (data.isValid) {
                 sessionStorage.setItem('isAdminAuthenticated', 'true');
@@ -299,8 +302,6 @@
         if(!err && data && data.status === 'success') {
           rawMembersData = data.members;
           populateCategoryDropdown(rawMembersData);
-          
-          // 마감 상태 반영
           sysStatus = data.sysStatus || "진행";
           updateSysStatusUI();
         } else {
@@ -309,7 +310,6 @@
       });
     }
 
-    // 마감 상태 UI 업데이트
     function updateSysStatusUI() {
       const banner = document.getElementById('closed-banner');
       const btnToggle = document.getElementById('btn-toggle-sys');
@@ -329,7 +329,6 @@
       }
     }
 
-    // 마감 버튼 누를 때 실행되는 함수
     function toggleSystemState() {
       const newStatus = (sysStatus === '진행') ? '마감' : '진행';
       if(!confirm(`정말로 신청을 '${newStatus}' 처리하시겠습니까?`)) return;
@@ -344,7 +343,7 @@
           showToast(`정상적으로 ${newStatus} 처리되었습니다.`);
         } else {
           showToast("오류가 발생했습니다.");
-          updateSysStatusUI(); // 원래대로 복구
+          updateSysStatusUI();
         }
       });
     }
@@ -395,7 +394,15 @@
       currentMatchedUser = matched;
       setLoading(true);
 
-      jsonpCall({ action: 'getUserStatus', studentId: matched.studentId, date: targetDate }, (err, data) => {
+      // 수정된 부분: 이름, 구분, 학과를 모두 구글 시트로 넘겨주어 고유하게 확인
+      jsonpCall({ 
+        action: 'getUserStatus', 
+        studentId: matched.studentId, 
+        name: matched.name,
+        category: matched.category,
+        dept: matched.dept,
+        date: targetDate 
+      }, (err, data) => {
         setLoading(false);
         if(!err && data && data.status === 'success') {
           currentStatus = data.userStatus;
@@ -429,11 +436,10 @@
         btn.style.background = 'var(--primary)';
       }
 
-      // 시스템이 마감된 상태라면 버튼 비활성화 처리
       if (sysStatus === '마감') {
         btn.disabled = true;
         btn.innerText = '신청 및 취소 불가 (마감)';
-        btn.style.background = '#94a3b8'; // 회색
+        btn.style.background = '#94a3b8'; 
         btn.style.cursor = 'not-allowed';
       } else {
         btn.disabled = false;
@@ -491,13 +497,14 @@
           }
 
           data.records.forEach(r => {
+            // 수정된 부분: 임원용 수령확인 버튼에서도 성명, 구분, 학과를 모두 넘겨주어 고유하게 처리
             tbody.innerHTML += `
               <tr>
                 <td>${r.category} ${r.dept}</td>
                 <td><strong>${r.name}</strong></td>
                 <td><span class="status-tag ${r.status === '수령완료' ? 'tag-completed' : (r.status === '신청취소' ? 'tag-canceled' : 'tag-none')}">${r.status}</span></td>
                 <td class="no-print">
-                  ${r.status === '신청완료' ? `<button onclick="markReceive('${r.studentId}')" style="padding:4px 8px; font-size:12px; background:var(--primary); color:white; border:none; border-radius:4px; cursor:pointer;">수령확인</button>` : '-'}
+                  ${r.status === '신청완료' ? `<button onclick="markReceive('${r.studentId}', '${r.name}', '${r.category}', '${r.dept}')" style="padding:4px 8px; font-size:12px; background:var(--primary); color:white; border:none; border-radius:4px; cursor:pointer;">수령확인</button>` : '-'}
                 </td>
               </tr>
             `;
@@ -506,9 +513,17 @@
       });
     }
 
-    function markReceive(studentId) {
+    function markReceive(studentId, name, category, dept) {
       const date = document.getElementById('admin-date').value;
-      jsonpCall({ action: 'updateStatus', studentId: studentId, date: date, status: '수령완료' }, (err, data) => {
+      jsonpCall({ 
+        action: 'updateStatus', 
+        studentId: studentId, 
+        name: name,
+        category: category,
+        dept: dept,
+        date: date, 
+        status: '수령완료' 
+      }, (err, data) => {
         if(!err && data && data.status === 'success') {
           showToast("수령 처리되었습니다.");
           loadAdminData();
