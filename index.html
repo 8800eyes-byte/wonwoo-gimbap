@@ -3,142 +3,161 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>대학원 원우회 김밥 신청 시스템</title>
-
-  <!-- 1. 카카오톡 인앱 브라우저 자동 탈출 및 외부 브라우저(크롬/사파리) 강제 전환 스크립트 -->
-  <script>
-    (function redirectToExternalBrowser() {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const targetUrl = location.href;
-
-      if (userAgent.indexOf('kakao') > -1) {
-        if (userAgent.indexOf('android') > -1) {
-          // 안드로이드(갤럭시): 크롬 전용 Intent 스키마로 강제 열기
-          location.href = 'intent://' + targetUrl.replace(/https?:\/\//i, '') + '#Intent;scheme=https;package=com.android.chrome;end';
-        } else if (userAgent.indexOf('iphone') > -1 || userAgent.indexOf('ipad') > -1 || userAgent.indexOf('ipod') > -1) {
-          // 아이폰: 사파리 열기 유도 스키마
-          location.href = 'googlechrome://' + targetUrl.replace(/https?:\/\//i, '');
-        }
-      }
-    })();
-  </script>
-
+  <title>원우회 김밥 신청 시스템</title>
   <style>
     :root {
-      --primary: #2563eb;
-      --primary-hover: #1d4ed8;
-      --bg-color: #f8fafc;
+      --primary-color: #0047a0;
+      --bg-color: #f4f6f9;
       --card-bg: #ffffff;
-      --text-main: #1e293b;
-      --text-sub: #64748b;
-      --border: #e2e8f0;
-      --success: #16a34a;
-      --danger: #dc2626;
-      --warning: #d97706;
+      --text-color: #333333;
     }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; padding: 16px; display: flex; flex-direction: column; align-items: center; }
-    .container { width: 100%; max-width: 500px; background: var(--card-bg); border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01); padding: 24px; margin-top: 10px; }
-    
-    .nav-tabs { display: flex; background: #e2e8f0; padding: 4px; border-radius: 12px; margin-bottom: 20px; width: 100%; max-width: 500px; }
-    .tab-btn { flex: 1; padding: 12px; border: none; background: transparent; font-size: 15px; font-weight: 600; color: var(--text-sub); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-    .tab-btn.active { background: white; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-
-    .header { text-align: center; margin-bottom: 24px; }
-    .header h1 { font-size: 22px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; }
-    .header p { font-size: 14px; color: var(--text-sub); }
-    .badge { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin-bottom: 8px; }
-    .date-badge { display: inline-block; background: #1e293b; color: #ffffff; font-size: 14px; font-weight: 600; padding: 6px 14px; border-radius: 8px; margin-bottom: 12px; }
-
-    .form-group { margin-bottom: 18px; }
-    label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; color: var(--text-main); }
-    select, input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; background: white; outline: none; transition: border-color 0.2s; }
-    select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-    
-    button.btn-main { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    button.btn-main:hover { background: var(--primary-hover); }
-    button.btn-secondary { width: 100%; padding: 10px; background: #f1f5f9; color: var(--text-main); border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
-    button.btn-secondary:hover { background: #e2e8f0; }
-
-    .status-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-top: 20px; display: none; }
-    .status-card.active { display: block; }
-    .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .status-title { font-size: 15px; font-weight: 600; }
-    .status-tag { padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700; }
-    .tag-completed { background: #dcfce7; color: #15803d; }
-    .tag-canceled { background: #fee2e2; color: #b91c1c; }
-    .tag-none { background: #f1f5f9; color: #64748b; }
-
-    .admin-panel { display: none; }
-    .admin-panel.active { display: block; }
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-    .stat-box { background: #f1f5f9; padding: 16px; border-radius: 10px; text-align: center; }
-    .stat-num { font-size: 24px; font-weight: 700; color: var(--primary); margin-top: 4px; }
-    
-    .list-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
-    .list-table th, .list-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--border); }
-    .list-table th { background: #f8fafc; color: var(--text-sub); font-weight: 600; }
-
-    .loader { display: none; border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100; }
-    .toast.show { opacity: 1; }
-
-    @media print {
-      body { background: white; padding: 0; }
-      .nav-tabs, .btn-main, .btn-secondary, .form-group, .header p, .no-print { display: none !important; }
-      .container { max-width: 100%; box-shadow: none; padding: 0; }
-      .list-table th, .list-table td { border: 1px solid #000; padding: 8px; }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 500px;
+      background: var(--card-bg);
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    h2 {
+      text-align: center;
+      color: var(--primary-color);
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    select, input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-size: 15px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background-color: #003377;
+    }
+    button:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+    #loadingOverlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 255, 0.85);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--primary-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .status-msg {
+      margin-top: 12px;
+      font-weight: bold;
+      color: #555;
+    }
+    .notice {
+      background-color: #eef4ff;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #0047a0;
+      margin-bottom: 16px;
     }
   </style>
 </head>
 <body>
 
-  <div class="nav-tabs">
-    <button class="tab-btn active" onclick="switchTab('user', this)">김밥 신청</button>
-    <button class="tab-btn" onclick="switchTab('admin', this)">📋 신청 현황 (임원용)</button>
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="status-msg" id="loadingText">시스템 데이터를 불러오는 중...</div>
+</div>
+
+<div class="container">
+  <h2>🍙 원우회 김밥 신청</h2>
+  
+  <div class="notice">
+    📌 학번과 성명을 선택하신 후 수령일자를 지정해 주세요.
   </div>
 
-  <div id="user-section" class="container">
-    <div class="header">
-      <span class="badge">🎓 대학원 원우회 복지사업</span><br>
-      <div id="display-date-badge" class="date-badge">📅 날짜 불러오는 중...</div>
-      <h1>🍙 원우회 김밥 신청</h1>
-      <p>구분, 학과를 선택하고 본인의 성명을 입력해 주세요.</p>
-    </div>
-
-    <div id="closed-banner" style="display:none; background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 16px;">
-      🛑 현재 김밥 신청이 마감되었습니다.
-    </div>
-
+  <form id="orderForm">
     <div class="form-group">
-      <label for="user-category">📚 구분 (학번 구분)</label>
-      <select id="user-category" onchange="onCategoryChange()">
-        <option value="">구분을 불러오는 중...</option>
+      <label for="dateSelect">📅 수령 일자</label>
+      <select id="dateSelect" required>
+        <option value="">일자를 선택하세요</option>
       </select>
     </div>
 
     <div class="form-group">
-      <label for="user-dept">🏛 학과</label>
-      <select id="user-dept" disabled>
+      <label for="categorySelect">🎓 구분 / 학과</label>
+      <select id="categorySelect" required>
+        <option value="">구분을 선택하세요</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="memberSelect">👤 신청자 (학번 / 성명)</label>
+      <select id="memberSelect" required disabled>
         <option value="">구분을 먼저 선택하세요</option>
       </select>
     </div>
 
-    <div class="form-group">
-      <label for="user-name">👤 성명 (이름 직접 입력)</label>
-      <input type="text" id="user-name" placeholder="성명을 직접 입력하세요 (예: 홍길동)">
-    </div>
+    <button type="submit" id="submitBtn" disabled>신청하기</button>
+  </form>
+</div>
 
-    <button class="btn-main" onclick="checkStatus()">
-      <div id="btn-loader" class="loader"></div>
-      <span id="btn-text">🔍 신청 여부 확인</span>
-    </button>
+<script>
+  // 🔗 배포된 구글 앱스 스크립트 웹앱 URL
+  const HARDCODED_URL = "https://script.google.com/macros/s/AKfycbwHv7z3qS_hGkHmQ7bEyxTJoG4lD4ApDcoHwplDjgXsLzgxReyFI4tCMkB9tGZCQj9v-Q/exec";
 
-    <div id="status-card" class="status-card">
-      <div class="status-header">
-        <span class="status-title" id="status-user-info">원우님</span>
-        <span id="status-tag" class="status-tag tag-none">미신청</span>
-      </div>
+  let memberData = [];
+
+  // JSONP 요청 헬퍼 함수
+  function requestJSONP(action, params = {}, callbackName) {
+    const script = document.createElement('script');
+    let queryParams = `?action=${action}&callback=${callbackName}`;
+    for (let key in params) {
+      queryParams += `&${key}=${encodeURIComponent(params[key])}`;
+    }
+    script.src = HARDCODED_URL
