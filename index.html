@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>대학원 원우회 복지사업 - 김밥 신청</title>
   
-  <!-- 카카오톡 인앱 브라우저 감지 및 외부 브라우저 자동 전환 -->
+  <!-- 카카오톡 인앱 브라우저 감지 및 외부 브라우저 안전 자동 전환 -->
   <script>
     (function() {
       try {
@@ -18,9 +18,7 @@
             location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(targetUrl);
           }
         }
-      } catch (e) {
-        // 예외 발생 시 무시
-      }
+      } catch (e) {}
     })();
   </script>
 
@@ -117,10 +115,8 @@
           <input type="text" id="nameInput" placeholder="성명을 직접 입력하세요 (예: 홍길동)" required disabled>
         </div>
 
-        <!-- 신청하기 버튼 (초기 노출) -->
+        <!-- 버튼 전환 영역 -->
         <button type="submit" class="btn-submit" id="submitBtn" disabled>신청하기</button>
-        
-        <!-- 취소하기 버튼 (신청 성공 시 노출) -->
         <button type="button" class="btn-cancel" id="cancelBtn">신청 취소하기</button>
       </form>
     </div>
@@ -142,19 +138,16 @@
   let memberData = [];
   let calculatedTargetDate = "";
 
+  // 공백 제거 (검증용)
+  function cleanStr(str) { return str ? String(str).replace(/\s+/g, '') : ''; }
+
   function getNextOrderDate() {
     const now = new Date();
     const day = now.getDay();
     let target = new Date(now);
-
-    if (day === 1 || day === 2) {
-      target.setDate(now.getDate() + (2 - day));
-    } else if (day === 3 || day === 4) {
-      target.setDate(now.getDate() + (4 - day));
-    } else {
-      const daysUntilNextTuesday = (2 - day + 7) % 7 || 7;
-      target.setDate(now.getDate() + daysUntilNextTuesday);
-    }
+    if (day === 1 || day === 2) target.setDate(now.getDate() + (2 - day));
+    else if (day === 3 || day === 4) target.setDate(now.getDate() + (4 - day));
+    else target.setDate(now.getDate() + ((2 - day + 7) % 7 || 7));
 
     const yyyy = target.getFullYear();
     const mm = String(target.getMonth() + 1).padStart(2, '0');
@@ -165,9 +158,7 @@
   function requestJSONP(action, params = {}, callbackName) {
     const script = document.createElement('script');
     let queryParams = `?action=${action}&callback=${callbackName}&_=${Date.now()}`;
-    for (let key in params) {
-      queryParams += `&${key}=${encodeURIComponent(params[key])}`;
-    }
+    for (let key in params) queryParams += `&${key}=${encodeURIComponent(params[key])}`;
     script.src = HARDCODED_URL + queryParams;
     script.onerror = function() {
       hideLoading();
@@ -178,10 +169,7 @@
 
   function showLoading(msg) {
     const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-      document.getElementById('loadingText').innerText = msg || "처리 중...";
-      overlay.style.display = "flex";
-    }
+    if (overlay) { document.getElementById('loadingText').innerText = msg || "처리 중..."; overlay.style.display = "flex"; }
   }
 
   function hideLoading() {
@@ -192,7 +180,6 @@
   function switchTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-
     if (tabName === 'apply') {
       document.querySelectorAll('.tab-btn')[0].classList.add('active');
       document.getElementById('tab-apply').classList.add('active');
@@ -212,48 +199,57 @@
     }
   };
 
-  // ✅ 신청 성공 시: 버튼 교체 및 폼 잠금
+  // 📝 핵심 로직: 결과에 따라 똑똑하게 버튼 바꿔주기
   window.handleSubmitResult = function(response) {
     hideLoading();
     if (response && response.status === "success") {
       alert("🎉 김밥 신청이 성공적으로 완료되었습니다!");
-      
-      // 버튼 교체 (신청 숨기고 취소 보이기)
-      document.getElementById('submitBtn').style.display = 'none';
-      document.getElementById('cancelBtn').style.display = 'block';
-      
-      // 입력창 잠금 (실수로 다른 이름으로 취소하지 않도록)
-      document.getElementById('categorySelect').disabled = true;
-      document.getElementById('departmentSelect').disabled = true;
-      document.getElementById('nameInput').disabled = true;
+      lockFormAndShowCancel();
     } else {
-      alert("신청 실패: " + ((response && response.message) || "오류"));
+      // 서버에서 보낸 에러 메시지를 확인합니다.
+      var errMsg = (response && response.message) || "";
+      
+      // 이미 신청한 사람이 [신청하기]를 누른 경우 (중복 방지 시스템이 작동했을 때)
+      if (errMsg.indexOf("중복") > -1 || errMsg.indexOf("이미") > -1) {
+        alert("⚠️ 이미 신청 완료된 상태입니다.\n\n기존 신청을 취소하시려면 하단의 [신청 취소하기] 버튼을 눌러주세요.");
+        lockFormAndShowCancel(); // 취소할 수 있도록 폼을 잠그고 취소 버튼을 꺼내줍니다!
+      } else {
+        alert("신청 실패: " + errMsg);
+      }
     }
   };
 
-  // ✅ 취소 성공 시: 버튼 교체 및 폼 잠금 해제
   window.handleCancelResult = function(response) {
     hideLoading();
     if (response && response.status === "success") {
-      alert("🗑️ 신청이 성공적으로 취소되었습니다.");
-      
-      // 버튼 교체 (취소 숨기고 신청 보이기)
-      document.getElementById('cancelBtn').style.display = 'none';
-      document.getElementById('submitBtn').style.display = 'block';
-      
-      // 입력창 잠금 해제 (다시 신청할 수 있도록)
-      document.getElementById('categorySelect').disabled = false;
-      document.getElementById('departmentSelect').disabled = false;
-      document.getElementById('nameInput').disabled = false;
+      alert("🗑️ 기존 신청 내역이 성공적으로 취소되었습니다.\n이제 다시 신청할 수 있습니다.");
+      resetFormAndShowSubmit();
     } else {
       alert("❌ 취소 실패: " + ((response && response.message) || "신청 내역이 없습니다."));
     }
   };
 
+  function lockFormAndShowCancel() {
+    document.getElementById('submitBtn').style.display = 'none';
+    document.getElementById('cancelBtn').style.display = 'block';
+    document.getElementById('categorySelect').disabled = true;
+    document.getElementById('departmentSelect').disabled = true;
+    document.getElementById('nameInput').disabled = true;
+  }
+
+  function resetFormAndShowSubmit() {
+    document.getElementById('cancelBtn').style.display = 'none';
+    document.getElementById('submitBtn').style.display = 'block';
+    document.getElementById('orderForm').reset();
+    document.getElementById('departmentSelect').disabled = true;
+    document.getElementById('nameInput').disabled = true;
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('categorySelect').disabled = false;
+  }
+
   function populateCategories(members) {
     const categorySelect = document.getElementById('categorySelect');
     categorySelect.innerHTML = '<option value="">구분을 선택하세요</option>';
-    
     const categories = [...new Set(members.map(m => m.category).filter(Boolean))];
     categories.forEach(cat => {
       const opt = document.createElement('option');
@@ -266,15 +262,10 @@
   document.getElementById('categorySelect').addEventListener('change', function(e) {
     const selectedCat = e.target.value;
     const departmentSelect = document.getElementById('departmentSelect');
-    
     departmentSelect.innerHTML = '<option value="">학과를 선택하세요</option>';
     document.getElementById('nameInput').disabled = true;
     document.getElementById('submitBtn').disabled = true;
-
-    if (!selectedCat) {
-      departmentSelect.disabled = true;
-      return;
-    }
+    if (!selectedCat) { departmentSelect.disabled = true; return; }
 
     const departments = [...new Set(memberData.filter(m => m.category === selectedCat).map(m => m.department).filter(Boolean))];
     departments.forEach(dept => {
@@ -283,7 +274,6 @@
       opt.textContent = dept;
       departmentSelect.appendChild(opt);
     });
-
     departmentSelect.disabled = false;
   });
 
@@ -298,7 +288,7 @@
     }
   });
 
-  // 신청하기 클릭 이벤트
+  // ▶️ 신청하기 버튼 클릭
   document.getElementById('orderForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const category = document.getElementById('categorySelect').value;
@@ -307,7 +297,18 @@
 
     if (!category || !department || !name) return alert("모든 항목을 입력해 주세요.");
 
-    showLoading("신청을 제출하는 중입니다...");
+    // 명단에 있는 사람인지 검증
+    if (memberData.length > 0 && memberData[0].hasOwnProperty('name')) {
+      const isValidName = memberData.some(m => 
+        m.category === category && m.department === department && cleanStr(m.name) === cleanStr(name)
+      );
+      if (!isValidName) {
+        alert("입력하신 정보가 원우회 명단에 존재하지 않습니다.\n구분, 학과, 성명을 정확히 입력했는지 확인해 주세요.");
+        return;
+      }
+    }
+
+    showLoading("신청 내역을 확인하는 중입니다...");
     requestJSONP('submitOrder', {
       date: calculatedTargetDate,
       category: category,
@@ -316,14 +317,13 @@
     }, 'handleSubmitResult');
   });
 
-  // 취소하기 클릭 이벤트
+  // ▶️ 취소하기 버튼 클릭
   document.getElementById('cancelBtn').addEventListener('click', function() {
-    // 폼이 잠겨있어도 value 값은 정상적으로 가져옵니다.
     const category = document.getElementById('categorySelect').value;
     const department = document.getElementById('departmentSelect').value;
     const name = document.getElementById('nameInput').value.trim();
 
-    if(confirm("정말로 신청을 취소하시겠습니까?")) {
+    if(confirm("정말로 기존 김밥 신청을 취소하시겠습니까?")) {
       showLoading("신청을 취소하는 중입니다...");
       requestJSONP('cancelOrder', {
         date: calculatedTargetDate,
@@ -337,7 +337,6 @@
   document.addEventListener("DOMContentLoaded", function() {
     calculatedTargetDate = getNextOrderDate();
     document.getElementById('targetDateBadge').innerText = `📅 ${calculatedTargetDate} 김밥 신청`;
-
     showLoading("시스템 데이터를 불러오는 중...");
     requestJSONP('getInitialData', {}, 'handleInitialData');
   });
