@@ -130,17 +130,4 @@
 
     const yyyy = target.getFullYear();
     const mm = String(target.getMonth() + 1).padStart(2, '0');
-    const dd = String(target.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  function requestJSONP(action, params = {}, callbackName) {
-    const script = document.createElement('script');
-    let queryParams = `?action=${action}&callback=${callbackName}&_=${Date.now()}`;
-    for (let key in params) {
-      queryParams += `&${key}=${encodeURIComponent(params[key])}`;
-    }
-    script.src = HARDCODED_URL + queryParams;
-    script.onerror = function() {
-      hideLoading();
-      alert("서버 통
+    const dd = String(
