@@ -130,4 +130,157 @@
 
     const yyyy = target.getFullYear();
     const mm = String(target.getMonth() + 1).padStart(2, '0');
-    const dd = String(
+    const dd = String(target.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function requestJSONP(action, params = {}, callbackName) {
+    const script = document.createElement('script');
+    let queryParams = `?action=${action}&callback=${callbackName}&_=${Date.now()}`;
+    for (let key in params) {
+      queryParams += `&${key}=${encodeURIComponent(params[key])}`;
+    }
+    script.src = HARDCODED_URL + queryParams;
+    script.onerror = function() {
+      hideLoading();
+      alert("서버 통신 오류가 발생했습니다. 새로고침 해주세요.");
+    };
+    document.body.appendChild(script);
+  }
+
+  function showLoading(msg) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+      document.getElementById('loadingText').innerText = msg || "처리 중...";
+      overlay.style.display = "flex";
+    }
+  }
+
+  function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+      overlay.style.display = "none";
+    }
+  }
+
+  function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+    if (tabName === 'apply') {
+      document.querySelectorAll('.tab-btn')[0].classList.add('active');
+      document.getElementById('tab-apply').classList.add('active');
+    } else {
+      document.querySelectorAll('.tab-btn')[1].classList.add('active');
+      document.getElementById('tab-status').classList.add('active');
+    }
+  }
+
+  window.handleInitialData = function(response) {
+    hideLoading();
+    if (response && response.status === "success") {
+      memberData = response.members || [];
+      populateCategories(memberData);
+    } else {
+      alert("데이터를 불러오지 못했습니다.");
+    }
+  };
+
+  window.handleSubmitResult = function(response) {
+    hideLoading();
+    if (response && response.status === "success") {
+      alert("🎉 김밥 신청이 성공적으로 완료되었습니다!");
+      document.getElementById('orderForm').reset();
+      document.getElementById('departmentSelect').disabled = true;
+      document.getElementById('nameInput').disabled = true;
+      document.getElementById('submitBtn').disabled = true;
+    } else {
+      alert("신청 실패: " + ((response && response.message) || "오류"));
+    }
+  };
+
+  function populateCategories(members) {
+    const categorySelect = document.getElementById('categorySelect');
+    categorySelect.innerHTML = '<option value="">구분을 선택하세요</option>';
+    
+    const categories = [...new Set(members.map(m => m.category).filter(Boolean))];
+    categories.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat;
+      categorySelect.appendChild(opt);
+    });
+  }
+
+  document.getElementById('categorySelect').addEventListener('change', function(e) {
+    const selectedCat = e.target.value;
+    const departmentSelect = document.getElementById('departmentSelect');
+    const nameInput = document.getElementById('nameInput');
+    const submitBtn = document.getElementById('submitBtn');
+
+    departmentSelect.innerHTML = '<option value="">학과를 선택하세요</option>';
+    nameInput.disabled = true;
+    submitBtn.disabled = true;
+
+    if (!selectedCat) {
+      departmentSelect.disabled = true;
+      return;
+    }
+
+    const departments = [...new Set(memberData.filter(m => m.category === selectedCat).map(m => m.department).filter(Boolean))];
+    departments.forEach(dept => {
+      const opt = document.createElement('option');
+      opt.value = dept;
+      opt.textContent = dept;
+      departmentSelect.appendChild(opt);
+    });
+
+    departmentSelect.disabled = false;
+  });
+
+  document.getElementById('departmentSelect').addEventListener('change', function(e) {
+    const selectedDept = e.target.value;
+    const nameInput = document.getElementById('nameInput');
+    const submitBtn = document.getElementById('submitBtn');
+
+    if (selectedDept) {
+      nameInput.disabled = false;
+      submitBtn.disabled = false;
+    } else {
+      nameInput.disabled = true;
+      submitBtn.disabled = true;
+    }
+  });
+
+  document.getElementById('orderForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const category = document.getElementById('categorySelect').value;
+    const department = document.getElementById('departmentSelect').value;
+    const name = document.getElementById('nameInput').value.trim();
+
+    if (!category || !department || !name) {
+      alert("모든 항목을 입력해 주세요.");
+      return;
+    }
+
+    showLoading("신청을 제출하는 중입니다...");
+    requestJSONP('submitOrder', {
+      date: calculatedTargetDate,
+      category: category,
+      department: department,
+      name: name
+    }, 'handleSubmitResult');
+  });
+
+  // 안전한 방식으로 로딩 스크립트 실행
+  document.addEventListener("DOMContentLoaded", function() {
+    calculatedTargetDate = getNextOrderDate();
+    document.getElementById('targetDateBadge').innerText = `📅 ${calculatedTargetDate} 김밥 신청`;
+
+    showLoading("시스템 데이터를 불러오는 중...");
+    requestJSONP('getInitialData', {}, 'handleInitialData');
+  });
+</script>
+
+</body>
+</html>
