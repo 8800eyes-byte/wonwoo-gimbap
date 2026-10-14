@@ -10,7 +10,6 @@
     (function() {
       try {
         var ua = navigator.userAgent.toLowerCase();
-        // 카카오톡 앱 내부일 때만 동작
         if (ua.indexOf('kakao') > -1) {
           var targetUrl = location.href;
           if (ua.indexOf('android') > -1) {
@@ -20,7 +19,7 @@
           }
         }
       } catch (err) {
-        // PC나 다른 브라우저에서는 오류가 나더라도 무시하고 정상 진행
+        // 모바일 외 환경 예외 무시
       }
     })();
   </script>
@@ -151,40 +150,4 @@
     }
 
     const yyyy = target.getFullYear();
-    const mm = String(target.getMonth() + 1).padStart(2, '0');
-    const dd = String(target.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  function requestJSONP(action, params = {}, callbackName) {
-    const script = document.createElement('script');
-    let queryParams = `?action=${action}&callback=${callbackName}&_=${Date.now()}`;
-    for (let key in params) {
-      queryParams += `&${key}=${encodeURIComponent(params[key])}`;
-    }
-    script.src = HARDCODED_URL + queryParams;
-    script.onerror = function() {
-      hideLoading();
-      alert("서버 통신 오류가 발생했습니다.");
-    };
-    document.body.appendChild(script);
-  }
-
-  function showLoading(msg) {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-      document.getElementById('loadingText').innerText = msg || "처리 중...";
-      overlay.style.display = "flex";
-    }
-  }
-
-  function hideLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-      overlay.style.display = "none";
-    }
-  }
-
-  function switchTab(tabName) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content
+    const mm = String(target.getMonth() + 1).padStart(2, '
