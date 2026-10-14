@@ -5,106 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>원우회 김밥 신청 시스템</title>
   <style>
-    :root {
-      --primary-color: #0047a0;
-      --bg-color: #f4f6f9;
-      --card-bg: #ffffff;
-      --text-color: #333333;
-    }
-    body {
-      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      justify-content: center;
-    }
-    .container {
-      width: 100%;
-      max-width: 500px;
-      background: var(--card-bg);
-      padding: 24px;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    }
-    h2 {
-      text-align: center;
-      color: var(--primary-color);
-      margin-bottom: 20px;
-    }
-    .form-group {
-      margin-bottom: 16px;
-    }
-    label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 6px;
-      font-size: 14px;
-    }
-    select, input {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      box-sizing: border-box;
-      font-size: 15px;
-    }
-    button {
-      width: 100%;
-      padding: 14px;
-      background-color: var(--primary-color);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 10px;
-      transition: background 0.2s;
-    }
-    button:hover {
-      background-color: #003377;
-    }
-    button:disabled {
-      background-color: #aaa;
-      cursor: not-allowed;
-    }
-    #loadingOverlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(255, 255, 255, 0.85);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid var(--primary-color);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .status-msg {
-      margin-top: 12px;
-      font-weight: bold;
-      color: #555;
-    }
-    .notice {
-      background-color: #eef4ff;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 13px;
-      color: #0047a0;
-      margin-bottom: 16px;
-    }
+    :root { --primary-color: #0047a0; --bg-color: #f4f6f9; --card-bg: #ffffff; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 480px; background: var(--card-bg); padding: 24px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    h2 { text-align: center; color: var(--primary-color); margin-bottom: 20px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+    select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; }
+    button { width: 100%; padding: 14px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    #loadingOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
+    .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .status-msg { margin-top: 12px; font-weight: bold; color: #333; }
+    .notice { background-color: #eef4ff; padding: 12px; border-radius: 8px; font-size: 13px; color: #0047a0; margin-bottom: 16px; }
   </style>
 </head>
 <body>
@@ -116,48 +30,142 @@
 
 <div class="container">
   <h2>🍙 원우회 김밥 신청</h2>
-  
-  <div class="notice">
-    📌 학번과 성명을 선택하신 후 수령일자를 지정해 주세요.
-  </div>
+  <div class="notice">📌 구분/학과를 지정하신 후 신청자 명단을 선택해 주세요.</div>
 
   <form id="orderForm">
     <div class="form-group">
       <label for="dateSelect">📅 수령 일자</label>
-      <select id="dateSelect" required>
-        <option value="">일자를 선택하세요</option>
-      </select>
+      <select id="dateSelect" required><option value="">일자를 선택하세요</option></select>
     </div>
-
     <div class="form-group">
       <label for="categorySelect">🎓 구분 / 학과</label>
-      <select id="categorySelect" required>
-        <option value="">구분을 선택하세요</option>
-      </select>
+      <select id="categorySelect" required><option value="">구분을 선택하세요</option></select>
     </div>
-
     <div class="form-group">
       <label for="memberSelect">👤 신청자 (학번 / 성명)</label>
-      <select id="memberSelect" required disabled>
-        <option value="">구분을 먼저 선택하세요</option>
-      </select>
+      <select id="memberSelect" required disabled><option value="">구분을 먼저 선택하세요</option></select>
     </div>
-
     <button type="submit" id="submitBtn" disabled>신청하기</button>
   </form>
 </div>
 
 <script>
-  // 🔗 배포된 구글 앱스 스크립트 웹앱 URL
   const HARDCODED_URL = "https://script.google.com/macros/s/AKfycbwHv7z3qS_hGkHmQ7bEyxTJoG4lD4ApDcoHwplDjgXsLzgxReyFI4tCMkB9tGZCQj9v-Q/exec";
-
   let memberData = [];
+  let fetchTimer = null;
 
-  // JSONP 요청 헬퍼 함수
   function requestJSONP(action, params = {}, callbackName) {
+    clearTimeout(fetchTimer);
     const script = document.createElement('script');
-    let queryParams = `?action=${action}&callback=${callbackName}`;
+    let queryParams = `?action=${action}&callback=${callbackName}&_=${Date.now()}`;
     for (let key in params) {
       queryParams += `&${key}=${encodeURIComponent(params[key])}`;
     }
-    script.src = HARDCODED_URL
+    script.src = HARDCODED_URL + queryParams;
+    
+    // 8초 후 타임아웃 처리
+    fetchTimer = setTimeout(() => {
+      hideLoading();
+      alert("데이터 불러오기 시간이 초과되었습니다. 페이지를 다시 고침(F5) 해주세요.");
+    }, 8000);
+
+    script.onerror = function() {
+      clearTimeout(fetchTimer);
+      hideLoading();
+      alert("서버 연결에 실패했습니다.");
+    };
+    document.body.appendChild(script);
+  }
+
+  function showLoading(msg) {
+    document.getElementById('loadingText').innerText = msg || "처리 중...";
+    document.getElementById('loadingOverlay').style.display = "flex";
+  }
+
+  function hideLoading() {
+    clearTimeout(fetchTimer);
+    document.getElementById('loadingOverlay').style.display = "none";
+  }
+
+  window.handleInitialData = function(response) {
+    hideLoading();
+    if (response && response.status === "success") {
+      memberData = response.members || [];
+      populateDates(response.dates || []);
+      populateCategories(memberData);
+      document.getElementById('submitBtn').disabled = false;
+    } else {
+      alert("데이터 읽기 실패: " + ((response && response.message) || "알 수 없는 오류"));
+    }
+  };
+
+  window.handleSubmitResult = function(response) {
+    hideLoading();
+    if (response && response.status === "success") {
+      alert("🎉 김밥 신청이 성공적으로 완료되었습니다!");
+      document.getElementById('orderForm').reset();
+      document.getElementById('memberSelect').disabled = true;
+    } else {
+      alert("신청 실패: " + ((response && response.message) || "오류 발생"));
+    }
+  };
+
+  function populateDates(dates) {
+    const dateSelect = document.getElementById('dateSelect');
+    dateSelect.innerHTML = '<option value="">일자를 선택하세요</option>';
+    dates.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = d;
+      dateSelect.appendChild(opt);
+    });
+  }
+
+  function populateCategories(members) {
+    const categorySelect = document.getElementById('categorySelect');
+    categorySelect.innerHTML = '<option value="">구분을 선택하세요</option>';
+    const categories = [...new Set(members.map(m => m.category || m.department).filter(Boolean))];
+    categories.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat; opt.textContent = cat;
+      categorySelect.appendChild(opt);
+    });
+  }
+
+  document.getElementById('categorySelect').addEventListener('change', function(e) {
+    const selectedCat = e.target.value;
+    const memberSelect = document.getElementById('memberSelect');
+    memberSelect.innerHTML = '<option value="">신청자를 선택하세요</option>';
+
+    if (!selectedCat) {
+      memberSelect.disabled = true;
+      return;
+    }
+
+    const filtered = memberData.filter(m => (m.category || m.department) === selectedCat);
+    filtered.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = `${m.studentId} ${m.name}`;
+      opt.textContent = `${m.studentId ? '[' + m.studentId + '] ' : ''}${m.name}`;
+      memberSelect.appendChild(opt);
+    });
+    memberSelect.disabled = false;
+  });
+
+  document.getElementById('orderForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const date = document.getElementById('dateSelect').value;
+    const category = document.getElementById('categorySelect').value;
+    const memberId = document.getElementById('memberSelect').value;
+
+    showLoading("신청을 제출하는 중입니다...");
+    requestJSONP('submitOrder', { date: date, category: category, memberId: memberId }, 'handleSubmitResult');
+  });
+
+  window.onload = function() {
+    showLoading("시스템 데이터를 불러오는 중...");
+    requestJSONP('getInitialData', {}, 'handleInitialData');
+  };
+</script>
+
+</body>
+</html>
