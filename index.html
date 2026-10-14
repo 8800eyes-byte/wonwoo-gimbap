@@ -5,25 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>대학원 원우회 복지사업 - 김밥 신청</title>
   
-  <!-- 카카오톡 인앱 브라우저 안전 우회 스크립트 -->
-  <script>
-    (function() {
-      try {
-        var ua = navigator.userAgent.toLowerCase();
-        if (ua.indexOf('kakao') > -1) {
-          var targetUrl = location.href;
-          if (ua.indexOf('android') > -1) {
-            location.href = 'intent://' + targetUrl.replace(/^https?:\/\//i, '') + '#Intent;scheme=https;package=com.android.chrome;end';
-          } else if (ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1) {
-            location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(targetUrl);
-          }
-        }
-      } catch (err) {
-        // 모바일 외 환경 예외 무시
-      }
-    })();
-  </script>
-
   <style>
     :root {
       --primary-blue: #2563eb;
@@ -139,15 +120,27 @@
     let target = new Date(now);
 
     if (day === 1 || day === 2) {
-      const diff = 2 - day;
-      target.setDate(now.getDate() + diff);
+      target.setDate(now.getDate() + (2 - day));
     } else if (day === 3 || day === 4) {
-      const diff = 4 - day;
-      target.setDate(now.getDate() + diff);
+      target.setDate(now.getDate() + (4 - day));
     } else {
       const daysUntilNextTuesday = (2 - day + 7) % 7 || 7;
       target.setDate(now.getDate() + daysUntilNextTuesday);
     }
 
     const yyyy = target.getFullYear();
-    const mm = String(target.getMonth() + 1).padStart(2, '
+    const mm = String(target.getMonth() + 1).padStart(2, '0');
+    const dd = String(target.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function requestJSONP(action, params = {}, callbackName) {
+    const script = document.createElement('script');
+    let queryParams = `?action=${action}&callback=${callbackName}&_=${Date.now()}`;
+    for (let key in params) {
+      queryParams += `&${key}=${encodeURIComponent(params[key])}`;
+    }
+    script.src = HARDCODED_URL + queryParams;
+    script.onerror = function() {
+      hideLoading();
+      alert("서버 통
