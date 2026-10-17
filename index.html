@@ -68,23 +68,19 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
-    /* 관리자 탭 전용 스타일 */
     .admin-login-box { display: flex; gap: 8px; margin-top: 20px; }
     .admin-login-box input { flex: 1; }
     .admin-login-box button { padding: 12px 20px; background: #334155; color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; }
     
     .admin-dashboard { display: none; margin-top: 20px; }
     
-    .btn-close-order { width: 100%; padding: 12px; background-color: #f59e0b; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 10px; }
-    .btn-close-order:hover { background-color: #d97706; }
-
-    .btn-transfer-data { width: 100%; padding: 12px; background-color: #10b981; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 20px; }
-    .btn-transfer-data:hover { background-color: #059669; }
+    .btn-close-order { width: 100%; padding: 12px; background-color: #f59e0b; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: 0.2s; }
+    .btn-close-order.open { background-color: #10b981; } /* 마감 해제 상태일 때 초록색 */
     
-    /* 명단 UI 개선 */
+    .btn-transfer-data { width: 100%; padding: 12px; background-color: #2563eb; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 20px; }
+    
     .applicant-list { max-height: 400px; overflow-y: auto; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 10px; }
     .applicant-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f1f5f9; transition: background 0.2s; }
-    .applicant-item:hover { background: #f8fafc; }
     .applicant-item:last-child { border-bottom: none; }
     .app-info { display: flex; align-items: center; gap: 12px; flex: 1; }
     .app-dept { background: #eff6ff; color: #2563eb; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; }
@@ -155,7 +151,7 @@
       </div>
 
       <div id="adminDashboard" class="admin-dashboard">
-        <button type="button" class="btn-close-order" onclick="closeOrderSystem()">🛑 전체 신청 마감하기</button>
+        <button type="button" class="btn-close-order" id="btnToggleOrder" onclick="toggleOrderSystem()">🛑 전체 신청 마감하기</button>
         <button type="button" class="btn-transfer-data" onclick="transferDataToMonthly()">📥 데이터 보내기 (월별 누적)</button>
         
         <div style="font-weight: 800; margin-top: 10px; font-size: 16px;">🍙 현재 신청자 명단 (<span id="totalCount" style="color: var(--primary-blue);">0</span>명)</div>
@@ -166,10 +162,12 @@
 </div>
 
 <script>
-  // 🚨 아래 주소를 가장 최근에 생성하신 새 배포 URL로 변경해 주세요!
+  // 🚨 배포하신 최신 웹앱 URL을 입력해주세요!
   const HARDCODED_URL = "https://script.google.com/macros/s/AKfycbwHv7z3qS_hGkHmQ7bEyxTJoG4lD4ApDcoHwplDjgXsLzgxReyFI4tCMkB9tGZCQj9v-Q/exec";
+  
   let memberData = [];
   let calculatedTargetDate = "";
+  let isSystemClosed = false; // 시스템 마감 상태 전역 변수 추가
 
   function cleanStr(str) { return str ? String(str).replace(/\s+/g, '') : ''; }
 
@@ -221,13 +219,29 @@
     }
   }
 
+  // 관리자 마감 토글 버튼 UI 업데이트 함수
+  function updateAdminToggleButton() {
+    const btn = document.getElementById('btnToggleOrder');
+    if (!btn) return;
+    if (isSystemClosed) {
+      btn.innerText = "🟢 신청 마감 해제하기";
+      btn.classList.add('open');
+    } else {
+      btn.innerText = "🛑 전체 신청 마감하기";
+      btn.classList.remove('open');
+    }
+  }
+
   window.handleInitialData = function(response) {
     hideLoading();
     if (response && response.status === "success") {
       memberData = response.members || [];
       populateCategories(memberData);
       
-      if (response.isClosed) {
+      isSystemClosed = response.isClosed;
+      updateAdminToggleButton();
+
+      if (isSystemClosed) {
         document.getElementById('submitBtn').disabled = true;
         document.getElementById('submitBtn').innerText = "현재 신청이 마감되었습니다";
         document.getElementById('submitBtn').style.backgroundColor = "#94a3b8";
@@ -270,7 +284,7 @@
   document.getElementById('departmentSelect').addEventListener('change', function(e) {
     if (e.target.value) {
       document.getElementById('nameInput').disabled = false;
-      document.getElementById('submitBtn').disabled = false;
+      if(!isSystemClosed) document.getElementById('submitBtn').disabled = false;
     } else {
       document.getElementById('nameInput').disabled = true;
       document.getElementById('submitBtn').disabled = true;
@@ -303,7 +317,7 @@
 
   document.getElementById('orderForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    if (document.getElementById('submitBtn').innerText.indexOf("마감") > -1) return alert("현재 신청이 마감되었습니다.");
+    if (isSystemClosed) return alert("현재 신청이 마감되었습니다.");
     
     const category = document.getElementById('categorySelect').value;
     const department = document.getElementById('departmentSelect').value;
@@ -345,7 +359,6 @@
     }
   });
 
-  // 👑 관리자 로그인 (명단 UI 개선)
   window.handleAdminLogin = function(response) {
     hideLoading();
     if (response && response.status === "success") {
@@ -382,19 +395,39 @@
     requestJSONP('adminLogin', { pw: pw, date: calculatedTargetDate }, 'handleAdminLogin');
   }
 
-  window.handleCloseOrder = function(response) {
+  // 🔄 마감 & 마감 해제 토글 처리
+  window.handleToggleOrderState = function(response) {
     hideLoading();
     if (response && response.status === "success") {
-      alert("🛑 신청이 성공적으로 마감되었습니다.\n더 이상 일반 원우들이 신청할 수 없습니다.");
+      isSystemClosed = response.isClosed;
+      updateAdminToggleButton();
+
+      if (isSystemClosed) {
+        alert("🛑 신청이 마감되었습니다.\n더 이상 일반 원우들이 신청할 수 없습니다.");
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('submitBtn').innerText = "현재 신청이 마감되었습니다";
+        document.getElementById('submitBtn').style.backgroundColor = "#94a3b8";
+      } else {
+        alert("🟢 신청 마감이 해제되었습니다.\n이제 다시 원우들이 신청할 수 있습니다.");
+        if (document.getElementById('departmentSelect').value) {
+          document.getElementById('submitBtn').disabled = false;
+        }
+        document.getElementById('submitBtn').innerText = "신청하기";
+        document.getElementById('submitBtn').style.backgroundColor = "var(--primary-blue)";
+      }
     } else {
-      alert("마감 처리 실패");
+      alert("상태 변경 실패");
     }
   }
 
-  function closeOrderSystem() {
-    if(confirm("정말로 신청을 마감하시겠습니까?\n마감 시 추가 신청이 차단됩니다.")) {
-      showLoading("마감 처리 중...");
-      requestJSONP('closeOrder', {}, 'handleCloseOrder');
+  function toggleOrderSystem() {
+    const msg = isSystemClosed 
+      ? "신청 마감을 해제하시겠습니까?\n다시 원우들이 신청할 수 있게 됩니다." 
+      : "정말로 신청을 마감하시겠습니까?\n마감 시 추가 신청이 차단됩니다.";
+    
+    if(confirm(msg)) {
+      showLoading("상태 변경 중...");
+      requestJSONP('toggleOrderState', {}, 'handleToggleOrderState');
     }
   }
 
