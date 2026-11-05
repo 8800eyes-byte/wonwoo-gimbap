@@ -75,7 +75,7 @@
     .admin-dashboard { display: none; margin-top: 20px; }
     
     .btn-close-order { width: 100%; padding: 12px; background-color: #f59e0b; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: 0.2s; }
-    .btn-close-order.open { background-color: #10b981; } /* 마감 해제 상태일 때 초록색 */
+    .btn-close-order.open { background-color: #10b981; }
     
     .btn-transfer-data { width: 100%; padding: 12px; background-color: #2563eb; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 20px; }
     
@@ -86,6 +86,13 @@
     .app-dept { background: #eff6ff; color: #2563eb; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; }
     .app-name { font-size: 15px; font-weight: 700; color: #1e293b; white-space: nowrap; }
     .app-date { font-size: 13px; color: #94a3b8; font-weight: 600; white-space: nowrap; }
+    
+    /* 날짜 선택 영역 스타일 */
+    .date-picker-box { background: #f1f5f9; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #cbd5e1; }
+    .date-picker-label { display: block; font-size: 13px; color: #475569; font-weight: 700; margin-bottom: 8px; }
+    .date-picker-flex { display: flex; gap: 8px; }
+    .date-picker-flex input { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; }
+    .date-picker-flex button { padding: 10px 16px; background: #334155; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -151,10 +158,20 @@
       </div>
 
       <div id="adminDashboard" class="admin-dashboard">
+        <!-- 🚀 새로운 날짜 선택기 영역 추가 -->
+        <div class="date-picker-box">
+          <label class="date-picker-label">🗓️ 조회 및 데이터 전송 기준일자 (과거 날짜 선택 가능)</label>
+          <div class="date-picker-flex">
+            <input type="date" id="adminDateInput">
+            <button type="button" onclick="loadAdminDataForDate()">조회하기</button>
+          </div>
+        </div>
+
         <button type="button" class="btn-close-order" id="btnToggleOrder" onclick="toggleOrderSystem()">🛑 전체 신청 마감하기</button>
-        <button type="button" class="btn-transfer-data" onclick="transferDataToMonthly()">📥 데이터 보내기 (월별 누적)</button>
+        <!-- 버튼 텍스트 변경 -->
+        <button type="button" class="btn-transfer-data" onclick="transferDataToMonthly()">📥 선택한 날짜 데이터 보내기</button>
         
-        <div style="font-weight: 800; margin-top: 10px; font-size: 16px;">🍙 현재 신청자 명단 (<span id="totalCount" style="color: var(--primary-blue);">0</span>명)</div>
+        <div style="font-weight: 800; margin-top: 10px; font-size: 16px;">🍙 선택 일자 신청자 (<span id="totalCount" style="color: var(--primary-blue);">0</span>명)</div>
         <div class="applicant-list" id="applicantList"></div>
       </div>
     </div>
@@ -167,7 +184,7 @@
   
   let memberData = [];
   let calculatedTargetDate = "";
-  let isSystemClosed = false; // 시스템 마감 상태 전역 변수 추가
+  let isSystemClosed = false; 
 
   function cleanStr(str) { return str ? String(str).replace(/\s+/g, '') : ''; }
 
@@ -219,7 +236,6 @@
     }
   }
 
-  // 관리자 마감 토글 버튼 UI 업데이트 함수
   function updateAdminToggleButton() {
     const btn = document.getElementById('btnToggleOrder');
     if (!btn) return;
@@ -359,43 +375,64 @@
     }
   });
 
+  // 👑 관리자 로그인 시 달력 초기화 및 명단 출력
   window.handleAdminLogin = function(response) {
     hideLoading();
     if (response && response.status === "success") {
       document.getElementById('adminLoginArea').style.display = 'none';
       document.getElementById('adminDashboard').style.display = 'block';
       
-      const listEl = document.getElementById('applicantList');
-      listEl.innerHTML = '';
-      document.getElementById('totalCount').innerText = response.applicants.length;
-
-      if (response.applicants.length === 0) {
-        listEl.innerHTML = '<div style="text-align:center; padding:30px; color:#94a3b8; font-weight:600;">신청자가 없습니다.</div>';
-      } else {
-        response.applicants.forEach(app => {
-          listEl.innerHTML += `
-            <div class="applicant-item">
-              <div class="app-info">
-                <span class="app-dept">${app.dept}</span>
-                <span class="app-name">${app.name}</span>
-              </div>
-              <div class="app-date">${app.date}</div>
-            </div>`;
-        });
+      // 처음 진입 시 달력 날짜를 이번 신청일로 기본 세팅
+      if(!document.getElementById('adminDateInput').value) {
+        document.getElementById('adminDateInput').value = calculatedTargetDate;
       }
+      
+      renderApplicantList(response.applicants);
     } else {
       alert("비밀번호가 일치하지 않습니다.");
     }
   };
 
+  // 🚀 날짜 변경 후 [조회하기] 버튼 클릭 시 동작
+  function loadAdminDataForDate() {
+    const selectedDate = document.getElementById('adminDateInput').value;
+    if(!selectedDate) return alert("날짜를 선택해 주세요.");
+    const pw = document.getElementById('adminPw').value;
+    
+    showLoading(selectedDate + " 기준 명단 조회 중...");
+    requestJSONP('adminLogin', { pw: pw, date: selectedDate }, 'handleAdminLogin');
+  }
+
+  // 명단 그리기 분리
+  function renderApplicantList(applicants) {
+    const listEl = document.getElementById('applicantList');
+    listEl.innerHTML = '';
+    document.getElementById('totalCount').innerText = applicants.length;
+
+    if (applicants.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center; padding:30px; color:#94a3b8; font-weight:600;">선택하신 일자에 신청자가 없습니다.</div>';
+    } else {
+      applicants.forEach(app => {
+        listEl.innerHTML += `
+          <div class="applicant-item">
+            <div class="app-info">
+              <span class="app-dept">${app.dept}</span>
+              <span class="app-name">${app.name}</span>
+            </div>
+            <div class="app-date">${app.date}</div>
+          </div>`;
+      });
+    }
+  }
+
   function loginAdmin() {
     const pw = document.getElementById('adminPw').value;
     if (!pw) return alert("비밀번호를 입력해 주세요.");
     showLoading("확인 중...");
+    // 초기 로그인은 자동으로 계산된 날짜로 조회
     requestJSONP('adminLogin', { pw: pw, date: calculatedTargetDate }, 'handleAdminLogin');
   }
 
-  // 🔄 마감 & 마감 해제 토글 처리
   window.handleToggleOrderState = function(response) {
     hideLoading();
     if (response && response.status === "success") {
@@ -440,10 +477,14 @@
     }
   };
 
+  // 🚀 선택된 과거/현재 날짜의 데이터를 전송하도록 수정
   function transferDataToMonthly() {
-    if(confirm("현재 날짜(" + calculatedTargetDate + ")의 데이터를\n'월별_수령현황' 시트로 전송하시겠습니까?")) {
-      showLoading("데이터를 시트로 누적하는 중입니다...");
-      requestJSONP('transferData', { date: calculatedTargetDate }, 'handleTransferData');
+    const selectedDate = document.getElementById('adminDateInput').value;
+    if(!selectedDate) return alert("날짜를 달력에서 선택해 주세요.");
+
+    if(confirm(`[선택한 날짜: ${selectedDate}]\n\n이 날짜의 데이터를 '월별_수령현황' 시트로 전송하시겠습니까?`)) {
+      showLoading("선택한 날짜 데이터를 시트로 누적하는 중입니다...");
+      requestJSONP('transferData', { date: selectedDate }, 'handleTransferData');
     }
   }
 
