@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>대학원 원우회 복지사업 - 김밥 신청</title>
   
+  <!-- 진짜 엑셀(.xlsx) 파일 생성을 위한 SheetJS 라이브러리 추가 -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <script>
     (function() {
       try {
@@ -484,78 +487,58 @@
     }
   }
 
-  // 📊 요청하신 서식(김밥 신청 명단 타이틀 + 연번/구분/학과/학번/성명/수령일자/상태/수령여부) 엑셀 다운로드
+  // 📊 경고창 없는 표준 엑셀(.xlsx) 파일 생성 다운로드
   function downloadFormattedExcel() {
     if (!currentApplicantsList || currentApplicantsList.length === 0) {
       return alert("다운로드할 신청자 명단이 없습니다.");
     }
 
     const selectedDate = document.getElementById('adminDateInput').value || calculatedTargetDate;
-    
-    let rowsHtml = "";
+
+    // 1. 시트 데이터 배열 구성 (1행: 여백, 2행: 제목, 3행: 헤더, 4행~: 데이터)
+    const sheetData = [
+      [], // 1행 여백
+      ["김밥 신청 명단", "", "", "", "", "", "", ""], // 2행 제목
+      ["연번", "구분", "학과", "학번", "성명", "수령일자", "상태", "수령여부"] // 3행 표 헤더
+    ];
+
     currentApplicantsList.forEach((app, index) => {
-      const num = index + 1;
-      const cat = app.category || "";
-      const dept = app.dept || "";
-      const stuId = app.studentId || "";
-      const name = app.name || "";
-      const date = app.date || selectedDate;
-      
-      rowsHtml += `
-        <tr>
-          <td style="text-align:center;">${num}</td>
-          <td style="text-align:center;">${cat}</td>
-          <td style="text-align:center;">${dept}</td>
-          <td style="text-align:center; mso-number-format:'\\@';">${stuId}</td>
-          <td style="text-align:center;">${name}</td>
-          <td style="text-align:center;">${date}</td>
-          <td style="text-align:center;">신청완료</td>
-          <td style="text-align:center;"></td>
-        </tr>`;
+      sheetData.push([
+        index + 1,
+        app.category || "",
+        app.dept || "",
+        app.studentId || "",
+        app.name || "",
+        app.date || selectedDate,
+        "신청완료",
+        "" // 수령여부 서명란
+      ]);
     });
 
-    const excelHtml = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="utf-8">
-        <style>
-          table { border-collapse: collapse; font-family: '맑은 고딕', sans-serif; font-size: 11pt; }
-          th, td { border: 1px solid #000000; padding: 6px 10px; height: 28px; }
-          .title-row { font-size: 18pt; font-weight: bold; text-align: center; border: none; height: 45px; }
-          .header-row th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
-        </style>
-      </head>
-      <body>
-        <table>
-          <tr><td colspan="8" style="border:none; height:10px;"></td></tr>
-          <tr>
-            <td colspan="8" class="title-row">김밥 신청 명단</td>
-          </tr>
-          <tr class="header-row">
-            <th style="width:50px;">연번</th>
-            <th style="width:80px;">구분</th>
-            <th style="width:150px;">학과</th>
-            <th style="width:110px;">학번</th>
-            <th style="width:90px;">성명</th>
-            <th style="width:110px;">수령일자</th>
-            <th style="width:90px;">상태</th>
-            <th style="width:90px;">수령여부</th>
-          </tr>
-          ${rowsHtml}
-        </table>
-      </body>
-      </html>`;
+    // 2. 워크시트 생성
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-    const blob = new Blob(["\uFEFF" + excelHtml], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    
-    link.setAttribute("href", url);
-    link.setAttribute("download", `김밥_신청_명단_${selectedDate}.xls`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // 3. 제목 행(A2:H2) 셀 병합
+    ws["!merges"] = [
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
+    ];
+
+    // 4. 열 너비 자동 조절
+    ws["!cols"] = [
+      { wch: 7 },  // 연번
+      { wch: 10 }, // 구분
+      { wch: 22 }, // 학과
+      { wch: 15 }, // 학번
+      { wch: 12 }, // 성명
+      { wch: 14 }, // 수령일자
+      { wch: 12 }, // 상태
+      { wch: 12 }  // 수령여부
+    ];
+
+    // 5. 엑셀 워크북 생성 및 .xlsx 파일로 저장
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "김밥신청명단");
+    XLSX.writeFile(wb, `김밥_신청_명단_${selectedDate}.xlsx`);
   }
 
   document.addEventListener("DOMContentLoaded", function() {
