@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>대학원 원우회 복지사업 - 김밥 신청</title>
   
-  <!-- 진짜 엑셀(.xlsx) 파일 생성을 위한 SheetJS 라이브러리 추가 -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <script>
@@ -190,6 +189,7 @@
   let calculatedTargetDate = "";
   let isSystemClosed = false; 
   let currentApplicantsList = [];
+  let isSubmitting = false; // 중복 클릭(연타) 방지 플래그
 
   function cleanStr(str) { return str ? String(str).replace(/\s+/g, '') : ''; }
 
@@ -213,6 +213,8 @@
     for (let key in params) queryParams += `&${key}=${encodeURIComponent(params[key])}`;
     script.src = HARDCODED_URL + queryParams;
     script.onerror = function() {
+      isSubmitting = false;
+      document.getElementById('submitBtn').disabled = false;
       hideLoading();
       alert("서버 통신 오류가 발생했습니다. 새로고침 해주세요.");
     };
@@ -313,6 +315,7 @@
   });
 
   window.handleSubmitResult = function(response) {
+    isSubmitting = false;
     hideLoading();
     if (response && response.status === "success") {
       alert("🎉 김밥 신청이 성공적으로 완료되었습니다!");
@@ -331,6 +334,7 @@
         document.getElementById('departmentSelect').disabled = true;
         document.getElementById('nameInput').disabled = true;
       } else {
+        document.getElementById('submitBtn').disabled = false;
         alert("신청 실패: " + errMsg);
       }
     }
@@ -338,6 +342,7 @@
 
   document.getElementById('orderForm').addEventListener('submit', function(e) {
     e.preventDefault();
+    if (isSubmitting) return; // 이미 전송 중이면 무시
     if (isSystemClosed) return alert("현재 신청이 마감되었습니다.");
     
     const category = document.getElementById('categorySelect').value;
@@ -350,6 +355,8 @@
       if (!isValidName) return alert("입력하신 정보가 원우회 명단에 존재하지 않습니다.");
     }
 
+    isSubmitting = true;
+    document.getElementById('submitBtn').disabled = true;
     showLoading("신청을 처리하는 중입니다...");
     requestJSONP('submitOrder', { date: calculatedTargetDate, category: category, department: department, name: name }, 'handleSubmitResult');
   });
@@ -487,7 +494,6 @@
     }
   }
 
-  // 📊 경고창 없는 표준 엑셀(.xlsx) 파일 생성 다운로드
   function downloadFormattedExcel() {
     if (!currentApplicantsList || currentApplicantsList.length === 0) {
       return alert("다운로드할 신청자 명단이 없습니다.");
@@ -495,11 +501,10 @@
 
     const selectedDate = document.getElementById('adminDateInput').value || calculatedTargetDate;
 
-    // 1. 시트 데이터 배열 구성 (1행: 여백, 2행: 제목, 3행: 헤더, 4행~: 데이터)
     const sheetData = [
-      [], // 1행 여백
-      ["김밥 신청 명단", "", "", "", "", "", "", ""], // 2행 제목
-      ["연번", "구분", "학과", "학번", "성명", "수령일자", "상태", "수령여부"] // 3행 표 헤더
+      [],
+      ["김밥 신청 명단", "", "", "", "", "", "", ""],
+      ["연번", "구분", "학과", "학번", "성명", "수령일자", "상태", "수령여부"]
     ];
 
     currentApplicantsList.forEach((app, index) => {
@@ -511,31 +516,27 @@
         app.name || "",
         app.date || selectedDate,
         "신청완료",
-        "" // 수령여부 서명란
+        ""
       ]);
     });
 
-    // 2. 워크시트 생성
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-    // 3. 제목 행(A2:H2) 셀 병합
     ws["!merges"] = [
       { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
     ];
 
-    // 4. 열 너비 자동 조절
     ws["!cols"] = [
-      { wch: 7 },  // 연번
-      { wch: 10 }, // 구분
-      { wch: 22 }, // 학과
-      { wch: 15 }, // 학번
-      { wch: 12 }, // 성명
-      { wch: 14 }, // 수령일자
-      { wch: 12 }, // 상태
-      { wch: 12 }  // 수령여부
+      { wch: 7 },
+      { wch: 10 },
+      { wch: 22 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 12 }
     ];
 
-    // 5. 엑셀 워크북 생성 및 .xlsx 파일로 저장
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "김밥신청명단");
     XLSX.writeFile(wb, `김밥_신청_명단_${selectedDate}.xlsx`);
