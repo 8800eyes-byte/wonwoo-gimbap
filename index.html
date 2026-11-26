@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>대학원 원우회 복지사업 - 김밥 신청</title>
   
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- 셀 테두리, 배경색, 가운데 정렬 서식을 지원하는 xlsx-js-style 라이브러리 -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
   <script>
     (function() {
@@ -387,7 +388,6 @@
     }
   });
 
-  // 🔄 정렬 공통 함수: 1.구분 -> 2.학과 -> 3.학번 -> 4.성명 순 정렬
   function sortApplicants(list) {
     return list.slice().sort(function(a, b) {
       const catA = String(a.category || "").trim();
@@ -421,7 +421,6 @@
       isSystemClosed = response.isClosed;
       updateAdminToggleButton();
       
-      // 데이터를 받자마자 구분 -> 학과 -> 학번 -> 성명 순으로 정렬
       currentApplicantsList = sortApplicants(response.applicants || []);
       renderApplicantList(currentApplicantsList);
     } else {
@@ -516,6 +515,7 @@
     }
   }
 
+  // 📊 테두리 + 가운데 정렬 + 제목 서식이 완벽 적용된 표준 엑셀(.xlsx) 다운로드
   function downloadFormattedExcel() {
     if (!currentApplicantsList || currentApplicantsList.length === 0) {
       return alert("다운로드할 신청자 명단이 없습니다.");
@@ -524,41 +524,101 @@
     const selectedDate = document.getElementById('adminDateInput').value || calculatedTargetDate;
     const sortedList = sortApplicants(currentApplicantsList);
 
+    // 공통 테두리 스타일
+    const thinBorder = {
+      top: { style: "thin", color: { rgb: "000000" } },
+      bottom: { style: "thin", color: { rgb: "000000" } },
+      left: { style: "thin", color: { rgb: "000000" } },
+      right: { style: "thin", color: { rgb: "000000" } }
+    };
+
+    // 타이틀 스타일 (2행)
+    const titleStyle = {
+      font: { name: "맑은 고딕", sz: 18, bold: true },
+      alignment: { horizontal: "center", vertical: "center" }
+    };
+
+    // 표 헤더 스타일 (3행)
+    const headerStyle = {
+      font: { name: "맑은 고딕", sz: 11, bold: true },
+      alignment: { horizontal: "center", vertical: "center" },
+      fill: { fgColor: { rgb: "F2F2F2" } },
+      border: thinBorder
+    };
+
+    // 데이터 셀 스타일 (4행~)
+    const cellStyle = {
+      font: { name: "맑은 고딕", sz: 11 },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: thinBorder
+    };
+
     const sheetData = [
-      [],
-      ["김밥 신청 명단", "", "", "", "", "", "", ""],
-      ["연번", "구분", "학과", "학번", "성명", "수령일자", "상태", "수령여부"]
+      [], // 1행 여백
+      [
+        { v: "김밥 신청 명단", t: "s", s: titleStyle },
+        { v: "", t: "s", s: titleStyle },
+        { v: "", t: "s", s: titleStyle },
+        { v: "", t: "s", s: titleStyle },
+        { v: "", t: "s", s: titleStyle },
+        { v: "", t: "s", s: titleStyle },
+        { v: "", t: "s", s: titleStyle },
+        { v: "", t: "s", s: titleStyle }
+      ],
+      [
+        { v: "연번", t: "s", s: headerStyle },
+        { v: "구분", t: "s", s: headerStyle },
+        { v: "학과", t: "s", s: headerStyle },
+        { v: "학번", t: "s", s: headerStyle },
+        { v: "성명", t: "s", s: headerStyle },
+        { v: "수령일자", t: "s", s: headerStyle },
+        { v: "상태", t: "s", s: headerStyle },
+        { v: "수령여부", t: "s", s: headerStyle }
+      ]
     ];
 
     sortedList.forEach((app, index) => {
       sheetData.push([
-        index + 1,
-        app.category || "",
-        app.dept || "",
-        app.studentId || "",
-        app.name || "",
-        app.date || selectedDate,
-        "신청완료",
-        ""
+        { v: index + 1, t: "n", s: cellStyle },
+        { v: app.category || "", t: "s", s: cellStyle },
+        { v: app.dept || "", t: "s", s: cellStyle },
+        { v: app.studentId || "", t: "s", s: cellStyle },
+        { v: app.name || "", t: "s", s: cellStyle },
+        { v: app.date || selectedDate, t: "s", s: cellStyle },
+        { v: "신청완료", t: "s", s: cellStyle },
+        { v: "", t: "s", s: cellStyle }
       ]);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
+    // 제목 셀 병합 (A2:H2)
     ws["!merges"] = [
       { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
     ];
 
+    // 열 너비 설정
     ws["!cols"] = [
-      { wch: 7 },
-      { wch: 10 },
-      { wch: 22 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 12 },
-      { wch: 12 }
+      { wch: 7 },  // 연번
+      { wch: 10 }, // 구분
+      { wch: 22 }, // 학과
+      { wch: 15 }, // 학번
+      { wch: 12 }, // 성명
+      { wch: 14 }, // 수령일자
+      { wch: 12 }, // 상태
+      { wch: 12 }  // 수령여부
     ];
+
+    // 행 높이 설정 (제목은 높고, 본문은 보기 좋게 여유있게)
+    const rowHeights = [
+      { hpt: 12 }, // 1행
+      { hpt: 36 }, // 2행 (타이틀)
+      { hpt: 26 }  // 3행 (헤더)
+    ];
+    for (let i = 0; i < sortedList.length; i++) {
+      rowHeights.push({ hpt: 23 }); // 데이터 행 높이
+    }
+    ws["!rows"] = rowHeights;
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "김밥신청명단");
