@@ -189,7 +189,7 @@
   let calculatedTargetDate = "";
   let isSystemClosed = false; 
   let currentApplicantsList = [];
-  let isSubmitting = false; // 중복 클릭(연타) 방지 플래그
+  let isSubmitting = false;
 
   function cleanStr(str) { return str ? String(str).replace(/\s+/g, '') : ''; }
 
@@ -342,7 +342,7 @@
 
   document.getElementById('orderForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    if (isSubmitting) return; // 이미 전송 중이면 무시
+    if (isSubmitting) return;
     if (isSystemClosed) return alert("현재 신청이 마감되었습니다.");
     
     const category = document.getElementById('categorySelect').value;
@@ -387,6 +387,27 @@
     }
   });
 
+  // 🔄 정렬 공통 함수: 1.구분 -> 2.학과 -> 3.학번 -> 4.성명 순 정렬
+  function sortApplicants(list) {
+    return list.slice().sort(function(a, b) {
+      const catA = String(a.category || "").trim();
+      const catB = String(b.category || "").trim();
+      if (catA !== catB) return catA.localeCompare(catB, 'ko');
+
+      const deptA = String(a.dept || "").trim();
+      const deptB = String(b.dept || "").trim();
+      if (deptA !== deptB) return deptA.localeCompare(deptB, 'ko');
+
+      const idA = String(a.studentId || "").trim();
+      const idB = String(b.studentId || "").trim();
+      if (idA !== idB) return idA.localeCompare(idB, 'ko', { numeric: true });
+
+      const nameA = String(a.name || "").trim();
+      const nameB = String(b.name || "").trim();
+      return nameA.localeCompare(nameB, 'ko');
+    });
+  }
+
   window.handleAdminLogin = function(response) {
     hideLoading();
     if (response && response.status === "success") {
@@ -400,7 +421,8 @@
       isSystemClosed = response.isClosed;
       updateAdminToggleButton();
       
-      currentApplicantsList = response.applicants || [];
+      // 데이터를 받자마자 구분 -> 학과 -> 학번 -> 성명 순으로 정렬
+      currentApplicantsList = sortApplicants(response.applicants || []);
       renderApplicantList(currentApplicantsList);
     } else {
       alert("비밀번호가 일치하지 않습니다.");
@@ -500,6 +522,7 @@
     }
 
     const selectedDate = document.getElementById('adminDateInput').value || calculatedTargetDate;
+    const sortedList = sortApplicants(currentApplicantsList);
 
     const sheetData = [
       [],
@@ -507,7 +530,7 @@
       ["연번", "구분", "학과", "학번", "성명", "수령일자", "상태", "수령여부"]
     ];
 
-    currentApplicantsList.forEach((app, index) => {
+    sortedList.forEach((app, index) => {
       sheetData.push([
         index + 1,
         app.category || "",
