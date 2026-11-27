@@ -1,637 +1,409 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>대학원 원우회 복지사업 - 김밥 신청</title>
-  
-  <!-- 셀 테두리, 배경색, 가운데 정렬 서식을 지원하는 xlsx-js-style 라이브러리 -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+function doGet(e) {
+  var action = e.parameter.action;
+  var callback = e.parameter.callback;
+  var result = {};
 
-  <script>
-    (function() {
-      try {
-        var ua = navigator.userAgent.toLowerCase();
-        if (ua.indexOf('kakaotalk') > -1) {
-          var targetUrl = location.href;
-          if (ua.indexOf('android') > -1) {
-            location.href = 'intent://' + targetUrl.replace(/^https?:\/\//i, '') + '#Intent;scheme=https;package=com.android.chrome;end';
-          } else if (ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1) {
-            location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(targetUrl);
-          }
+  try {
+    if (action === 'getInitialData') {
+      result = getInitialData(e.parameter);
+    } else if (action === 'submitOrder') {
+      result = submitOrder(e.parameter);
+    } else if (action === 'cancelOrder') {
+      result = cancelOrder(e.parameter);
+    } else if (action === 'adminLogin') {
+      result = adminLogin(e.parameter);
+    } else if (action === 'toggleOrderState') {
+      result = toggleOrderState(e.parameter);
+    } else if (action === 'transferData') {
+      result = transferData(e.parameter);
+    } else {
+      result = { status: 'error', message: '알 수 없는 요청입니다.' };
+    }
+  } catch (error) {
+    result = { status: 'error', message: error.toString() };
+  }
+
+  var jsonOutput = JSON.stringify(result);
+  return ContentService.createTextOutput(callback + '(' + jsonOutput + ')')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function safeString(val) { return val ? String(val).replace(/\s+/g, '') : ""; }
+function safeDateString(val) {
+  if (!val) return "";
+  if (val instanceof Date) return Utilities.formatDate(val, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  var str = String(val).trim();
+  if (str.match(/^\d{4}-\d{2}-\d{2}$/)) return str;
+  var d = new Date(val);
+  if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  return str;
+}
+
+// ⏰ 마감 여부 확인 (수동 마감 + 당일 오전 10시 자동 마감 + 임원 수동 해제 예외)
+function isDateClosed(dateStr) {
+  if (!dateStr) return false;
+  var props = PropertiesService.getScriptProperties();
+  
+  // 1. 임원진이 10시 이후에 예외적으로 수동 '마감 해제'한 날짜인지 확인
+  var openedDates = JSON.parse(props.getProperty('openedDates') || "[]");
+  if (openedDates.indexOf(dateStr) > -1) {
+    return false;
+  }
+
+  // 2. 임원진이 수동으로 '마감'한 날짜인지 확인
+  var closedDates = JSON.parse(props.getProperty('closedDates') || "[]");
+  if (closedDates.indexOf(dateStr) > -1) {
+    return true;
+  }
+
+  // 3. 수령일 당일 오전 10시(10:00) 이후 자동 마감 체크 (한국 시간 기준)
+  var tz = Session.getScriptTimeZone();
+  var now = new Date();
+  var todayStr = Utilities.formatDate(now, tz, "yyyy-MM-dd");
+  var currentHour = parseInt(Utilities.formatDate(now, tz, "H"), 10);
+
+  if (dateStr === todayStr && currentHour >= 10) {
+    return true;
+  }
+  if (dateStr < todayStr) {
+    return true;
+  }
+
+  return false;
+}
+
+function getInitialData(params) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("명단") || ss.getSheetByName("월별_수령현황") || ss.getSheets()[0]; 
+  var data = sheet.getDataRange().getValues();
+  var members = [];
+  
+  if (data.length > 0) {
+    var h = data[0];
+    var catIdx = h.indexOf("구분") > -1 ? h.indexOf("구분") : 0;
+    var deptIdx = h.indexOf("학과") > -1 ? h.indexOf("학과") : 1;
+    var nameIdx = h.indexOf("성명") > -1 ? h.indexOf("성명") : 3;
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][catIdx] && data[i][nameIdx]) { 
+        members.push({ 
+          category: data[i][catIdx].toString().trim(), 
+          department: data[i][deptIdx].toString().trim(), 
+          name: data[i][nameIdx].toString().trim() 
+        });
+      }
+    }
+  }
+  
+  var targetDate = safeDateString(params.date);
+  var isClosed = isDateClosed(targetDate);
+
+  return { status: 'success', members: members, isClosed: isClosed };
+}
+
+function submitOrder(params) {
+  var targetDate = safeDateString(params.date);
+  if (isDateClosed(targetDate)) {
+    return { status: 'error', message: '신청이 마감되었습니다. (당일 오전 10시 자동 마감)' };
+  }
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return { status: 'error', message: '접속자가 많아 처리가 지연되었습니다. 다시 시도해 주세요.' };
+  }
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("신청현황");
+    SpreadsheetApp.flush();
+    var data = sheet.getDataRange().getValues();
+
+    var pCat = safeString(params.category);
+    var pDept = safeString(params.department);
+    var pName = safeString(params.name);
+    var pDate = safeDateString(params.date);
+    var canceledRowIndex = -1;
+
+    for (var i = 1; i < data.length; i++) {
+      var rowCat = safeString(data[i][0]);
+      var rowDept = safeString(data[i][1]);
+      var rowName = safeString(data[i][3]);
+      var rowDate = safeDateString(data[i][4]);
+      var rowStatus = safeString(data[i][5]);
+
+      if (rowCat === pCat && rowDept === pDept && rowName === pName && rowDate === pDate) {
+        if (rowStatus === "신청완료" || rowStatus === "수령완료") {
+          return { status: 'error', message: '⚠️ 이미 김밥 신청이 완료된 원우님입니다. (중복 신청 불가)' };
+        } else if (rowStatus === "신청취소") {
+          canceledRowIndex = i + 1;
         }
-      } catch (e) {}
-    })();
-  </script>
-
-  <style>
-    :root {
-      --primary-blue: #2563eb;
-      --hover-blue: #1d4ed8;
-      --bg-gray: #f8fafc;
-      --card-bg: #ffffff;
-      --text-dark: #1e293b;
-      --text-muted: #64748b;
-      --border-color: #e2e8f0;
-    }
-
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: var(--bg-gray); color: var(--text-dark); margin: 0; padding: 16px; display: flex; justify-content: center; }
-    .app-container { width: 100%; max-width: 440px; }
-
-    .tab-nav { display: flex; background: #e2e8f0; padding: 4px; border-radius: 12px; margin-bottom: 20px; }
-    .tab-btn { flex: 1; padding: 12px; border: none; background: transparent; font-size: 15px; font-weight: 700; color: var(--text-muted); cursor: pointer; border-radius: 8px; transition: all 0.2s; }
-    .tab-btn.active { background: white; color: var(--primary-blue); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-
-    .card { background: var(--card-bg); padding: 24px 20px; border-radius: 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.04); border: 1px solid var(--border-color); }
-    .header-badge { text-align: center; margin-bottom: 12px; }
-    .badge-item { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
-    .date-badge { display: inline-block; background: #1e293b; color: white; font-size: 14px; font-weight: 700; padding: 6px 14px; border-radius: 8px; margin-top: 6px; }
-
-    .title { text-align: center; font-size: 22px; font-weight: 800; margin: 10px 0 6px 0; color: var(--text-dark); }
-    .sub-title { text-align: center; font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
-
-    .form-group { margin-bottom: 18px; }
-    label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 8px; color: var(--text-dark); }
-    select, input { width: 100%; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 15px; background-color: #fff; outline: none; }
-    select:focus, input:focus { border-color: var(--primary-blue); }
-
-    .btn-submit { width: 100%; padding: 15px; background-color: var(--primary-blue); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
-    .btn-submit:hover { background-color: var(--hover-blue); }
-    .btn-submit:disabled { background-color: #94a3b8; cursor: not-allowed; }
-
-    .btn-cancel { width: 100%; padding: 15px; background-color: #ef4444; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 10px; transition: background 0.2s; display: none; }
-    .btn-cancel:hover { background-color: #dc2626; }
-
-    #loadingOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
-    .spinner { width: 36px; height: 36px; border: 4px solid #e2e8f0; border-top: 4px solid var(--primary-blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    .status-msg { margin-top: 14px; font-size: 14px; font-weight: 700; color: var(--text-dark); }
-
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    .admin-login-box { display: flex; gap: 8px; margin-top: 20px; }
-    .admin-login-box input { flex: 1; }
-    .admin-login-box button { padding: 12px 20px; background: #334155; color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; }
-    
-    .admin-dashboard { display: none; margin-top: 20px; }
-    
-    .btn-close-order { width: 100%; padding: 12px; background-color: #f59e0b; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 8px; transition: 0.2s; }
-    .btn-close-order.open { background-color: #10b981; }
-    
-    .btn-transfer-data { width: 100%; padding: 12px; background-color: #2563eb; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 8px; }
-
-    .btn-download-excel { width: 100%; padding: 12px; background-color: #059669; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 20px; transition: background 0.2s; }
-    .btn-download-excel:hover { background-color: #047857; }
-    
-    .applicant-list { max-height: 400px; overflow-y: auto; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 10px; }
-    .applicant-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f1f5f9; transition: background 0.2s; }
-    .applicant-item:last-child { border-bottom: none; }
-    .app-info { display: flex; align-items: center; gap: 10px; flex: 1; }
-    .app-num { font-size: 13px; font-weight: 800; color: #64748b; min-width: 24px; }
-    .app-dept { background: #eff6ff; color: #2563eb; padding: 5px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; white-space: nowrap; }
-    .app-name { font-size: 15px; font-weight: 700; color: #1e293b; white-space: nowrap; }
-    .app-date { font-size: 12px; color: #94a3b8; font-weight: 600; white-space: nowrap; }
-    
-    .date-picker-box { background: #f1f5f9; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #cbd5e1; }
-    .date-picker-label { display: block; font-size: 13px; color: #475569; font-weight: 700; margin-bottom: 8px; }
-    .date-picker-flex { display: flex; gap: 8px; }
-    .date-picker-flex input { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; }
-    .date-picker-flex button { padding: 10px 16px; background: #334155; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-  </style>
-</head>
-<body>
-
-<div id="loadingOverlay">
-  <div class="spinner"></div>
-  <div class="status-msg" id="loadingText">시스템 데이터를 불러오는 중...</div>
-</div>
-
-<div class="app-container">
-  <div class="tab-nav">
-    <button class="tab-btn active" onclick="switchTab('apply')">김밥 신청</button>
-    <button class="tab-btn" onclick="switchTab('status')">📋 신청 현황 (임원용)</button>
-  </div>
-
-  <div id="tab-apply" class="tab-content active">
-    <div class="card">
-      <div class="header-badge">
-        <span class="badge-item">🎓 대학원 원우회 복지사업</span><br>
-        <div class="date-badge" id="targetDateBadge">📅 수령일 계산 중...</div>
-      </div>
-
-      <div class="title">🍙 원우회 김밥 신청</div>
-      <div class="sub-title">구분, 학과를 선택하고 본인의 성명을 입력해 주세요.</div>
-
-      <form id="orderForm">
-        <div class="form-group">
-          <label>📚 구분 (학번 구분)</label>
-          <select id="categorySelect" required>
-            <option value="">구분을 불러오는 중...</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>🏛️ 학과</label>
-          <select id="departmentSelect" required disabled>
-            <option value="">구분을 먼저 선택하세요</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>👤 성명 (이름 직접 입력)</label>
-          <input type="text" id="nameInput" placeholder="성명을 직접 입력하세요 (예: 홍길동)" required disabled>
-        </div>
-
-        <button type="submit" class="btn-submit" id="submitBtn" disabled>신청하기</button>
-        <button type="button" class="btn-cancel" id="cancelBtn">신청 취소하기</button>
-      </form>
-    </div>
-  </div>
-
-  <div id="tab-status" class="tab-content">
-    <div class="card">
-      <div class="title">📋 신청 현황 조회</div>
-      <div class="sub-title">임원진 전용 수령 현황 데이터 확인</div>
-      
-      <div id="adminLoginArea">
-        <p style="text-align: center; color: var(--text-muted); font-size: 14px;">임원진 비밀번호를 입력해 주세요.</p>
-        <div class="admin-login-box">
-          <input type="password" id="adminPw" placeholder="비밀번호 입력">
-          <button type="button" onclick="loginAdmin()">확인</button>
-        </div>
-      </div>
-
-      <div id="adminDashboard" class="admin-dashboard">
-        <div class="date-picker-box">
-          <label class="date-picker-label">🗓️ 조회 및 관리 기준일자 (과거 날짜 선택 가능)</label>
-          <div class="date-picker-flex">
-            <input type="date" id="adminDateInput">
-            <button type="button" onclick="loadAdminDataForDate()">조회하기</button>
-          </div>
-        </div>
-
-        <button type="button" class="btn-close-order" id="btnToggleOrder" onclick="toggleOrderSystem()">🛑 해당 일자 신청 마감하기</button>
-        <button type="button" class="btn-transfer-data" onclick="transferDataToMonthly()">📥 선택한 날짜 데이터 보내기</button>
-        <button type="button" class="btn-download-excel" onclick="downloadFormattedExcel()">📊 김밥 신청 명단 엑셀 다운로드</button>
-        
-        <div style="font-weight: 800; margin-top: 10px; font-size: 16px;">🍙 선택 일자 신청자 (<span id="totalCount" style="color: var(--primary-blue);">0</span>명)</div>
-        <div class="applicant-list" id="applicantList"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-  const HARDCODED_URL = "https://script.google.com/macros/s/AKfycbwHv7z3qS_hGkHmQ7bEyxTJoG4lD4ApDcoHwplDjgXsLzgxReyFI4tCMkB9tGZCQj9v-Q/exec";
-  
-  let memberData = [];
-  let calculatedTargetDate = "";
-  let isSystemClosed = false; 
-  let currentApplicantsList = [];
-  let isSubmitting = false;
-
-  function cleanStr(str) { return str ? String(str).replace(/\s+/g, '') : ''; }
-
-  function getNextOrderDate() {
-    const now = new Date();
-    const day = now.getDay();
-    let target = new Date(now);
-    if (day === 1 || day === 2) target.setDate(now.getDate() + (2 - day));
-    else if (day === 3 || day === 4) target.setDate(now.getDate() + (4 - day));
-    else target.setDate(now.getDate() + ((2 - day + 7) % 7 || 7));
-
-    const yyyy = target.getFullYear();
-    const mm = String(target.getMonth() + 1).padStart(2, '0');
-    const dd = String(target.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  function requestJSONP(action, params = {}, callbackName) {
-    const script = document.createElement('script');
-    let queryParams = `?action=${action}&callback=${callbackName}&_=${Date.now()}`;
-    for (let key in params) queryParams += `&${key}=${encodeURIComponent(params[key])}`;
-    script.src = HARDCODED_URL + queryParams;
-    script.onerror = function() {
-      isSubmitting = false;
-      document.getElementById('submitBtn').disabled = false;
-      hideLoading();
-      alert("서버 통신 오류가 발생했습니다. 새로고침 해주세요.");
-    };
-    document.body.appendChild(script);
-  }
-
-  function showLoading(msg) {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) { document.getElementById('loadingText').innerText = msg || "처리 중..."; overlay.style.display = "flex"; }
-  }
-
-  function hideLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) overlay.style.display = "none";
-  }
-
-  function switchTab(tabName) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    if (tabName === 'apply') {
-      document.querySelectorAll('.tab-btn')[0].classList.add('active');
-      document.getElementById('tab-apply').classList.add('active');
-    } else {
-      document.querySelectorAll('.tab-btn')[1].classList.add('active');
-      document.getElementById('tab-status').classList.add('active');
-    }
-  }
-
-  function updateAdminToggleButton() {
-    const btn = document.getElementById('btnToggleOrder');
-    if (!btn) return;
-    if (isSystemClosed) {
-      btn.innerText = "🟢 선택 일자 마감 해제하기";
-      btn.classList.add('open');
-    } else {
-      btn.innerText = "🛑 선택 일자 신청 마감하기";
-      btn.classList.remove('open');
-    }
-  }
-
-  window.handleInitialData = function(response) {
-    hideLoading();
-    if (response && response.status === "success") {
-      memberData = response.members || [];
-      populateCategories(memberData);
-      
-      isSystemClosed = response.isClosed;
-      updateAdminToggleButton();
-
-      if (isSystemClosed) {
-        document.getElementById('submitBtn').disabled = true;
-        document.getElementById('submitBtn').innerText = "해당 일자 신청이 마감되었습니다";
-        document.getElementById('submitBtn').style.backgroundColor = "#94a3b8";
-      }
-    } else {
-      alert("데이터를 불러오지 못했습니다.");
-    }
-  };
-
-  function populateCategories(members) {
-    const categorySelect = document.getElementById('categorySelect');
-    categorySelect.innerHTML = '<option value="">구분을 선택하세요</option>';
-    const categories = [...new Set(members.map(m => m.category).filter(Boolean))];
-    categories.forEach(cat => {
-      const opt = document.createElement('option');
-      opt.value = cat;
-      opt.textContent = cat;
-      categorySelect.appendChild(opt);
-    });
-  }
-
-  document.getElementById('categorySelect').addEventListener('change', function(e) {
-    const selectedCat = e.target.value;
-    const departmentSelect = document.getElementById('departmentSelect');
-    departmentSelect.innerHTML = '<option value="">학과를 선택하세요</option>';
-    document.getElementById('nameInput').disabled = true;
-    document.getElementById('submitBtn').disabled = true;
-    if (!selectedCat) { departmentSelect.disabled = true; return; }
-
-    const departments = [...new Set(memberData.filter(m => m.category === selectedCat).map(m => m.department).filter(Boolean))];
-    departments.forEach(dept => {
-      const opt = document.createElement('option');
-      opt.value = dept;
-      opt.textContent = dept;
-      departmentSelect.appendChild(opt);
-    });
-    departmentSelect.disabled = false;
-  });
-
-  document.getElementById('departmentSelect').addEventListener('change', function(e) {
-    if (e.target.value) {
-      document.getElementById('nameInput').disabled = false;
-      if(!isSystemClosed) document.getElementById('submitBtn').disabled = false;
-    } else {
-      document.getElementById('nameInput').disabled = true;
-      document.getElementById('submitBtn').disabled = true;
-    }
-  });
-
-  window.handleSubmitResult = function(response) {
-    isSubmitting = false;
-    hideLoading();
-    if (response && response.status === "success") {
-      alert("🎉 김밥 신청이 성공적으로 완료되었습니다!");
-      document.getElementById('submitBtn').style.display = 'none';
-      document.getElementById('cancelBtn').style.display = 'block';
-      document.getElementById('categorySelect').disabled = true;
-      document.getElementById('departmentSelect').disabled = true;
-      document.getElementById('nameInput').disabled = true;
-    } else {
-      var errMsg = (response && response.message) || "";
-      if (errMsg.indexOf("중복") > -1 || errMsg.indexOf("이미") > -1) {
-        alert("⚠️ 이미 신청 완료된 상태입니다.\n\n취소하시려면 [신청 취소하기]를 눌러주세요.");
-        document.getElementById('submitBtn').style.display = 'none';
-        document.getElementById('cancelBtn').style.display = 'block';
-        document.getElementById('categorySelect').disabled = true;
-        document.getElementById('departmentSelect').disabled = true;
-        document.getElementById('nameInput').disabled = true;
-      } else {
-        document.getElementById('submitBtn').disabled = false;
-        alert("신청 실패: " + errMsg);
       }
     }
-  };
 
-  document.getElementById('orderForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    if (isSubmitting) return;
-    if (isSystemClosed) return alert("현재 신청이 마감되었습니다.");
-    
-    const category = document.getElementById('categorySelect').value;
-    const department = document.getElementById('departmentSelect').value;
-    const name = document.getElementById('nameInput').value.trim();
-    if (!category || !department || !name) return alert("모든 항목을 입력해 주세요.");
+    var studentId = "";
+    var memberSheet = ss.getSheetByName("명단") || ss.getSheetByName("월별_수령현황");
+    if (memberSheet) {
+      var memberData = memberSheet.getDataRange().getValues();
+      var h = memberData[0];
+      var cIdx = h.indexOf("구분") > -1 ? h.indexOf("구분") : 0;
+      var dIdx = h.indexOf("학과") > -1 ? h.indexOf("학과") : 1;
+      var idIdx = h.indexOf("학번") > -1 ? h.indexOf("학번") : 2;
+      var nIdx = h.indexOf("성명") > -1 ? h.indexOf("성명") : 3;
 
-    if (memberData.length > 0 && memberData[0].hasOwnProperty('name')) {
-      const isValidName = memberData.some(m => m.category === category && m.department === department && cleanStr(m.name) === cleanStr(name));
-      if (!isValidName) return alert("입력하신 정보가 원우회 명단에 존재하지 않습니다.");
-    }
-
-    isSubmitting = true;
-    document.getElementById('submitBtn').disabled = true;
-    showLoading("신청을 처리하는 중입니다...");
-    requestJSONP('submitOrder', { date: calculatedTargetDate, category: category, department: department, name: name }, 'handleSubmitResult');
-  });
-
-  window.handleCancelResult = function(response) {
-    hideLoading();
-    if (response && response.status === "success") {
-      alert("🗑️ 기존 신청 내역이 성공적으로 취소되었습니다.");
-      document.getElementById('cancelBtn').style.display = 'none';
-      document.getElementById('submitBtn').style.display = 'block';
-      document.getElementById('orderForm').reset();
-      document.getElementById('departmentSelect').disabled = true;
-      document.getElementById('nameInput').disabled = true;
-      document.getElementById('submitBtn').disabled = true;
-      document.getElementById('categorySelect').disabled = false;
-    } else {
-      alert("❌ 취소 실패: " + ((response && response.message) || "내역이 없습니다."));
-    }
-  };
-
-  document.getElementById('cancelBtn').addEventListener('click', function() {
-    if(confirm("정말로 기존 김밥 신청을 취소하시겠습니까?")) {
-      showLoading("신청을 취소하는 중입니다...");
-      requestJSONP('cancelOrder', {
-        date: calculatedTargetDate, category: document.getElementById('categorySelect').value,
-        department: document.getElementById('departmentSelect').value, name: document.getElementById('nameInput').value.trim()
-      }, 'handleCancelResult');
-    }
-  });
-
-  function sortApplicants(list) {
-    return list.slice().sort(function(a, b) {
-      const catA = String(a.category || "").trim();
-      const catB = String(b.category || "").trim();
-      if (catA !== catB) return catA.localeCompare(catB, 'ko');
-
-      const deptA = String(a.dept || "").trim();
-      const deptB = String(b.dept || "").trim();
-      if (deptA !== deptB) return deptA.localeCompare(deptB, 'ko');
-
-      const idA = String(a.studentId || "").trim();
-      const idB = String(b.studentId || "").trim();
-      if (idA !== idB) return idA.localeCompare(idB, 'ko', { numeric: true });
-
-      const nameA = String(a.name || "").trim();
-      const nameB = String(b.name || "").trim();
-      return nameA.localeCompare(nameB, 'ko');
-    });
-  }
-
-  window.handleAdminLogin = function(response) {
-    hideLoading();
-    if (response && response.status === "success") {
-      document.getElementById('adminLoginArea').style.display = 'none';
-      document.getElementById('adminDashboard').style.display = 'block';
-      
-      if(!document.getElementById('adminDateInput').value) {
-        document.getElementById('adminDateInput').value = calculatedTargetDate;
+      for (var j = 1; j < memberData.length; j++) {
+        if (safeString(memberData[j][cIdx]) === pCat && safeString(memberData[j][dIdx]) === pDept && safeString(memberData[j][nIdx]) === pName) {
+          studentId = memberData[j][idIdx] ? memberData[j][idIdx].toString().trim() : "";
+          break;
+        }
       }
-      
-      isSystemClosed = response.isClosed;
-      updateAdminToggleButton();
-      
-      currentApplicantsList = sortApplicants(response.applicants || []);
-      renderApplicantList(currentApplicantsList);
-    } else {
-      alert("비밀번호가 일치하지 않습니다.");
     }
-  };
 
-  function loadAdminDataForDate() {
-    const selectedDate = document.getElementById('adminDateInput').value;
-    if(!selectedDate) return alert("날짜를 선택해 주세요.");
-    const pw = document.getElementById('adminPw').value;
-    
-    showLoading(selectedDate + " 기준 명단 조회 중...");
-    requestJSONP('adminLogin', { pw: pw, date: selectedDate }, 'handleAdminLogin');
+    if (canceledRowIndex > -1) {
+      if (studentId) {
+        sheet.getRange(canceledRowIndex, 3).setValue(studentId);
+      }
+      sheet.getRange(canceledRowIndex, 6).setValue("신청완료");
+      SpreadsheetApp.flush();
+      return { status: 'success' };
+    }
+
+    sheet.appendRow([params.category, params.department, studentId, params.name, pDate, "신청완료"]);
+    SpreadsheetApp.flush();
+    return { status: 'success' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function cancelOrder(params) {
+  var targetDate = safeDateString(params.date);
+  if (isDateClosed(targetDate)) {
+    return { status: 'error', message: '신청이 마감되어 취소가 불가합니다. (당일 오전 10시 자동 마감)' };
   }
 
-  function renderApplicantList(applicants) {
-    const listEl = document.getElementById('applicantList');
-    listEl.innerHTML = '';
-    document.getElementById('totalCount').innerText = applicants.length;
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return { status: 'error', message: '잠시 후 다시 시도해 주세요.' };
+  }
 
-    if (applicants.length === 0) {
-      listEl.innerHTML = '<div style="text-align:center; padding:30px; color:#94a3b8; font-weight:600;">선택하신 일자에 신청자가 없습니다.</div>';
-    } else {
-      applicants.forEach((app, idx) => {
-        listEl.innerHTML += `
-          <div class="applicant-item">
-            <div class="app-info">
-              <span class="app-num">${idx + 1}.</span>
-              <span class="app-dept">${app.dept}</span>
-              <span class="app-name">${app.name}</span>
-            </div>
-            <div class="app-date">${app.date}</div>
-          </div>`;
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("신청현황");
+    var data = sheet.getDataRange().getValues();
+
+    var pCat = safeString(params.category);
+    var pDept = safeString(params.department);
+    var pName = safeString(params.name);
+    var pDate = safeDateString(params.date);
+    
+    var isCanceled = false;
+
+    for (var i = data.length - 1; i >= 1; i--) { 
+      if (safeString(data[i][0]) === pCat && 
+          safeString(data[i][1]) === pDept && 
+          safeString(data[i][3]) === pName && 
+          safeDateString(data[i][4]) === pDate && 
+          safeString(data[i][5]) === "신청완료") {
+        sheet.getRange(i + 1, 6).setValue("신청취소");
+        isCanceled = true;
+      }
+    }
+
+    if (isCanceled) {
+      SpreadsheetApp.flush();
+      return { status: 'success' };
+    }
+    return { status: 'error', message: '취소할 신청완료 내역을 찾지 못했습니다.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function adminLogin(params) {
+  if (params.pw !== "1234") {
+    return { status: 'error', message: '비밀번호 불일치' };
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("신청현황");
+  var data = sheet.getDataRange().getValues();
+  var applicants = [];
+  var targetDate = safeDateString(params.date);
+
+  for (var i = 1; i < data.length; i++) {
+    if (safeDateString(data[i][4]) === targetDate && safeString(data[i][5]) === "신청완료") {
+      applicants.push({
+        category: data[i][0].toString().trim(),
+        dept: data[i][1].toString().trim(),
+        studentId: data[i][2].toString().trim(),
+        name: data[i][3].toString().trim(),
+        date: safeDateString(data[i][4])
       });
     }
   }
+  
+  return { status: 'success', applicants: applicants, isClosed: isDateClosed(targetDate) };
+}
 
-  function loginAdmin() {
-    const pw = document.getElementById('adminPw').value;
-    if (!pw) return alert("비밀번호를 입력해 주세요.");
-    showLoading("확인 중...");
-    requestJSONP('adminLogin', { pw: pw, date: calculatedTargetDate }, 'handleAdminLogin');
+// 🔄 임원진 수동 마감 / 마감 해제 토글 (10시 자동 마감 예외 제어 포함)
+function toggleOrderState(params) {
+  var props = PropertiesService.getScriptProperties();
+  var targetDate = safeDateString(params.date);
+  
+  var closedDates = JSON.parse(props.getProperty('closedDates') || "[]");
+  var openedDates = JSON.parse(props.getProperty('openedDates') || "[]");
+  
+  var currentlyClosed = isDateClosed(targetDate);
+  var newState;
+  
+  if (currentlyClosed) {
+    // 현재 마감 상태(수동 마감 또는 10시 자동 마감) -> 수동으로 '마감 해제' 처리
+    var cIdx = closedDates.indexOf(targetDate);
+    if (cIdx > -1) closedDates.splice(cIdx, 1);
+    if (openedDates.indexOf(targetDate) === -1) openedDates.push(targetDate);
+    newState = false;
+  } else {
+    // 현재 열려 있는 상태 -> 수동으로 '마감' 처리
+    var oIdx = openedDates.indexOf(targetDate);
+    if (oIdx > -1) openedDates.splice(oIdx, 1);
+    if (closedDates.indexOf(targetDate) === -1) closedDates.push(targetDate);
+    newState = true;
+  }
+  
+  props.setProperty('closedDates', JSON.stringify(closedDates));
+  props.setProperty('openedDates', JSON.stringify(openedDates));
+  return { status: 'success', isClosed: newState };
+}
+
+function transferData(params) {
+  var targetDate = safeDateString(params.date);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  var orderSheet = ss.getSheetByName("신청현황");
+  var monthlySheet = ss.getSheetByName("월별_수령현황");
+  var rosterSheet = ss.getSheetByName("명단");
+  
+  if (!monthlySheet) {
+    monthlySheet = ss.insertSheet("월별_수령현황");
+    if (rosterSheet) {
+      monthlySheet.getRange(1, 1, 1, 5).setValues([["순번", "구분", "학과", "학번", "성명"]]);
+      monthlySheet.getRange(1, 1, 1, 5).setBackground("#ffff00");
+    }
   }
 
-  window.handleToggleOrderState = function(response) {
-    hideLoading();
-    if (response && response.status === "success") {
-      isSystemClosed = response.isClosed;
-      updateAdminToggleButton();
+  var masterIdMap = {};
 
-      const msgDate = document.getElementById('adminDateInput').value || calculatedTargetDate;
+  if (rosterSheet) {
+    var rData = rosterSheet.getDataRange().getValues();
+    var rH = rData[0];
+    var rC = rH.indexOf("구분") > -1 ? rH.indexOf("구분") : 0;
+    var rD = rH.indexOf("학과") > -1 ? rH.indexOf("학과") : 1;
+    var rId = rH.indexOf("학번") > -1 ? rH.indexOf("학번") : 2;
+    var rN = rH.indexOf("성명") > -1 ? rH.indexOf("성명") : 3;
 
-      if (isSystemClosed) {
-        alert(`🛑 [${msgDate}] 신청이 마감되었습니다.\n해당 일자의 추가 신청이 차단됩니다.`);
-      } else {
-        alert(`🟢 [${msgDate}] 신청 마감이 해제되었습니다.`);
+    for (var k = 1; k < rData.length; k++) {
+      var mCat = safeString(rData[k][rC]);
+      var mDept = safeString(rData[k][rD]);
+      var mName = safeString(rData[k][rN]);
+      var mStuId = rData[k][rId] ? rData[k][rId].toString().trim() : "";
+      if (mCat && mDept && mName && mStuId) {
+        masterIdMap[mCat + "|" + mDept + "|" + mName] = mStuId;
       }
+    }
+
+    if (monthlySheet) {
+      var mData = monthlySheet.getDataRange().getValues();
+      var existingMap = {};
+      for (var m = 1; m < mData.length; m++) {
+        var mKey = safeString(mData[m][1]) + "|" + safeString(mData[m][2]) + "|" + safeString(mData[m][4]);
+        existingMap[mKey] = m + 1; 
+      }
+
+      var newMembers = [];
+      var maxRow = mData.length;
+
+      for (var j = 1; j < rData.length; j++) {
+        var cat = safeString(rData[j][rC]);
+        var dept = safeString(rData[j][rD]);
+        var name = safeString(rData[j][rN]);
+        var stuId = rData[j][rId] ? rData[j][rId].toString().trim() : "";
+
+        if (cat && dept && name) {
+          var key = cat + "|" + dept + "|" + name;
+          
+          if (existingMap[key]) {
+            var mRow = existingMap[key];
+            var currentStuId = mData[mRow - 1][3] ? mData[mRow - 1][3].toString().trim() : "";
+            if (stuId && currentStuId !== stuId) {
+              monthlySheet.getRange(mRow, 4).setValue(stuId);
+            }
+          } else {
+            var newRow = [maxRow, rData[j][rC], rData[j][rD], stuId, rData[j][rN]];
+            var lastC = monthlySheet.getLastColumn();
+            for (var c = 5; c < lastC; c++) { newRow.push("-"); }
+            newMembers.push(newRow);
+            maxRow++;
+          }
+        }
+      }
+
+      if (newMembers.length > 0) {
+        monthlySheet.getRange(monthlySheet.getLastRow() + 1, 1, newMembers.length, newMembers[0].length).setValues(newMembers);
+      }
+    }
+  }
+
+  var orderData = orderSheet.getDataRange().getValues();
+  var appliedUsers = {};
+  
+  for (var i = 1; i < orderData.length; i++) {
+    var oCat = safeString(orderData[i][0]);
+    var oDept = safeString(orderData[i][1]);
+    var oStuId = orderData[i][2] ? orderData[i][2].toString().trim() : "";
+    var oName = safeString(orderData[i][3]);
+    var oKey = oCat + "|" + oDept + "|" + oName;
+
+    if (masterIdMap[oKey] && oStuId !== masterIdMap[oKey]) {
+      orderSheet.getRange(i + 1, 3).setValue(masterIdMap[oKey]);
+    }
+
+    if (safeDateString(orderData[i][4]) === targetDate && safeString(orderData[i][5]) === "신청완료") {
+      appliedUsers[oKey] = true;
+    }
+  }
+
+  var finalData = monthlySheet.getDataRange().getValues();
+  var lastCol = monthlySheet.getLastColumn();
+  if (lastCol < 5) lastCol = 5; 
+  
+  var targetCol = lastCol + 1; 
+  for (var c = 5; c < lastCol; c++) { 
+    if (safeDateString(finalData[0][c]) === targetDate) {
+      targetCol = c + 1;
+      break;
+    }
+  }
+
+  monthlySheet.getRange(1, targetCol).setValue("'" + targetDate);
+  monthlySheet.getRange(1, targetCol).setBackground("#ffff00");
+
+  for (var r = 1; r < finalData.length; r++) {
+    var cat = safeString(finalData[r][1]);
+    var dept = safeString(finalData[r][2]);
+    var name = safeString(finalData[r][4]);
+    var key = cat + "|" + dept + "|" + name;
+
+    if (appliedUsers[key]) {
+      monthlySheet.getRange(r + 1, targetCol).setValue("신청완료"); 
     } else {
-      alert("상태 변경 실패");
+      monthlySheet.getRange(r + 1, targetCol).setValue("-"); 
     }
   }
 
-  function toggleOrderSystem() {
-    const selectedDate = document.getElementById('adminDateInput').value || calculatedTargetDate;
-    const msg = isSystemClosed 
-      ? `[${selectedDate}] 일자의 신청 마감을 해제하시겠습니까?` 
-      : `[${selectedDate}] 일자의 신청을 마감하시겠습니까?`;
-    
-    if(confirm(msg)) {
-      showLoading("상태 변경 중...");
-      requestJSONP('toggleOrderState', { date: selectedDate }, 'handleToggleOrderState');
-    }
-  }
-
-  window.handleTransferData = function(response) {
-    hideLoading();
-    if (response && response.status === "success") {
-      alert("✅ 성공적으로 데이터가 '월별_수령현황' 시트에 누적 전송되었습니다!\n구글 시트를 확인해 보세요.");
-    } else {
-      alert("전송 실패: " + ((response && response.message) || "알 수 없는 오류"));
-    }
-  };
-
-  function transferDataToMonthly() {
-    const selectedDate = document.getElementById('adminDateInput').value;
-    if(!selectedDate) return alert("날짜를 달력에서 선택해 주세요.");
-
-    if(confirm(`[선택한 날짜: ${selectedDate}]\n\n이 날짜의 데이터를 '월별_수령현황' 시트로 전송하시겠습니까?`)) {
-      showLoading("선택한 날짜 데이터를 시트로 누적하는 중입니다...");
-      requestJSONP('transferData', { date: selectedDate }, 'handleTransferData');
-    }
-  }
-
-  // 📊 테두리 + 가운데 정렬 + 제목 서식이 완벽 적용된 표준 엑셀(.xlsx) 다운로드
-  function downloadFormattedExcel() {
-    if (!currentApplicantsList || currentApplicantsList.length === 0) {
-      return alert("다운로드할 신청자 명단이 없습니다.");
-    }
-
-    const selectedDate = document.getElementById('adminDateInput').value || calculatedTargetDate;
-    const sortedList = sortApplicants(currentApplicantsList);
-
-    // 공통 테두리 스타일
-    const thinBorder = {
-      top: { style: "thin", color: { rgb: "000000" } },
-      bottom: { style: "thin", color: { rgb: "000000" } },
-      left: { style: "thin", color: { rgb: "000000" } },
-      right: { style: "thin", color: { rgb: "000000" } }
-    };
-
-    // 타이틀 스타일 (2행)
-    const titleStyle = {
-      font: { name: "맑은 고딕", sz: 18, bold: true },
-      alignment: { horizontal: "center", vertical: "center" }
-    };
-
-    // 표 헤더 스타일 (3행)
-    const headerStyle = {
-      font: { name: "맑은 고딕", sz: 11, bold: true },
-      alignment: { horizontal: "center", vertical: "center" },
-      fill: { fgColor: { rgb: "F2F2F2" } },
-      border: thinBorder
-    };
-
-    // 데이터 셀 스타일 (4행~)
-    const cellStyle = {
-      font: { name: "맑은 고딕", sz: 11 },
-      alignment: { horizontal: "center", vertical: "center" },
-      border: thinBorder
-    };
-
-    const sheetData = [
-      [], // 1행 여백
-      [
-        { v: "김밥 신청 명단", t: "s", s: titleStyle },
-        { v: "", t: "s", s: titleStyle },
-        { v: "", t: "s", s: titleStyle },
-        { v: "", t: "s", s: titleStyle },
-        { v: "", t: "s", s: titleStyle },
-        { v: "", t: "s", s: titleStyle },
-        { v: "", t: "s", s: titleStyle },
-        { v: "", t: "s", s: titleStyle }
-      ],
-      [
-        { v: "연번", t: "s", s: headerStyle },
-        { v: "구분", t: "s", s: headerStyle },
-        { v: "학과", t: "s", s: headerStyle },
-        { v: "학번", t: "s", s: headerStyle },
-        { v: "성명", t: "s", s: headerStyle },
-        { v: "수령일자", t: "s", s: headerStyle },
-        { v: "상태", t: "s", s: headerStyle },
-        { v: "수령여부", t: "s", s: headerStyle }
-      ]
-    ];
-
-    sortedList.forEach((app, index) => {
-      sheetData.push([
-        { v: index + 1, t: "n", s: cellStyle },
-        { v: app.category || "", t: "s", s: cellStyle },
-        { v: app.dept || "", t: "s", s: cellStyle },
-        { v: app.studentId || "", t: "s", s: cellStyle },
-        { v: app.name || "", t: "s", s: cellStyle },
-        { v: app.date || selectedDate, t: "s", s: cellStyle },
-        { v: "신청완료", t: "s", s: cellStyle },
-        { v: "", t: "s", s: cellStyle }
-      ]);
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-    // 제목 셀 병합 (A2:H2)
-    ws["!merges"] = [
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
-    ];
-
-    // 열 너비 설정
-    ws["!cols"] = [
-      { wch: 7 },  // 연번
-      { wch: 10 }, // 구분
-      { wch: 22 }, // 학과
-      { wch: 15 }, // 학번
-      { wch: 12 }, // 성명
-      { wch: 14 }, // 수령일자
-      { wch: 12 }, // 상태
-      { wch: 12 }  // 수령여부
-    ];
-
-    // 행 높이 설정 (제목은 높고, 본문은 보기 좋게 여유있게)
-    const rowHeights = [
-      { hpt: 12 }, // 1행
-      { hpt: 36 }, // 2행 (타이틀)
-      { hpt: 26 }  // 3행 (헤더)
-    ];
-    for (let i = 0; i < sortedList.length; i++) {
-      rowHeights.push({ hpt: 23 }); // 데이터 행 높이
-    }
-    ws["!rows"] = rowHeights;
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "김밥신청명단");
-    XLSX.writeFile(wb, `김밥_신청_명단_${selectedDate}.xlsx`);
-  }
-
-  document.addEventListener("DOMContentLoaded", function() {
-    calculatedTargetDate = getNextOrderDate();
-    document.getElementById('targetDateBadge').innerText = `📅 ${calculatedTargetDate} 김밥 신청`;
-    showLoading("시스템 데이터를 불러오는 중...");
-    requestJSONP('getInitialData', { date: calculatedTargetDate }, 'handleInitialData');
-  });
-</script>
-
-</body>
-</html>
+  SpreadsheetApp.flush();
+  return { status: 'success' };
+}
